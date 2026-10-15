@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" role="img" aria-label="Escudo del Club Unión de Santo Tomé">
+  <defs>
+    <clipPath id="escudo">
+      <path d="M12 44 H108 V96 C108 124 86 140 60 148 C34 140 12 124 12 96 Z"/>
+    </clipPath>
+  </defs>
+  <!-- puente -->
+  <g fill="none" stroke="#f5f5f4" stroke-width="3" stroke-linecap="round">
+    <path d="M22 36 Q60 4 98 36"/>
+    <path d="M10 36 H110"/>
+    <path d="M34 25 V36 M46 18 V36 M60 15 V36 M74 18 V36 M86 25 V36" stroke-width="2"/>
+  </g>
+  <!-- franjas -->
+  <g clip-path="url(#escudo)">
+    <rect x="0" y="40" width="120" height="110" fill="#111"/>
+    <rect x="22" y="40" width="13" height="110" fill="#e0262d"/>
+    <rect x="48" y="40" width="13" height="110" fill="#e0262d"/>
+    <rect x="74" y="40" width="13" height="110" fill="#e0262d"/>
+    <rect x="100" y="40" width="13" height="110" fill="#e0262d"/>
+  </g>
+  <path d="M12 44 H108 V96 C108 124 86 140 60 148 C34 140 12 124 12 96 Z" fill="none" stroke="#f5f5f4" stroke-width="3"/>
+</svg>

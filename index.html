@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Rendimiento · Unión de Santo Tomé</title>
+  <link rel="icon" href="img/escudo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <div class="franjas" aria-hidden="true"></div>
+
+  <header class="cabecera">
+    <div class="contenedor cabecera-fila">
+      <img class="escudo" src="img/escudo.svg" alt="" width="44" height="55">
+      <div class="marca">
+        <p class="eyebrow">Club Unión de Santo Tomé · 1927</p>
+        <p class="marca-titulo">Rendimiento · Primera</p>
+      </div>
+      <div class="estado" id="estado" hidden>
+        <span id="actualizado" aria-live="polite"></span>
+        <button type="button" class="boton boton-chico" id="btn-actualizar">Actualizar</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Entrada con clave -->
+  <main class="contenedor acceso" id="acceso" hidden>
+    <div class="tarjeta acceso-tarjeta">
+      <img src="img/escudo.svg" alt="" width="72" height="90">
+      <h1 class="titulo">Área de rendimiento</h1>
+      <p class="nota">Ingresá la clave de acceso. Está al final del link que te pasó el preparador físico.</p>
+      <div class="acceso-form">
+        <label class="sr" for="clave">Clave</label>
+        <input id="clave" type="password" autocomplete="off" spellcheck="false" placeholder="Clave">
+        <button type="button" class="boton" id="btn-entrar">Entrar</button>
+      </div>
+      <p class="nota nota-error" id="acceso-error" role="alert" hidden></p>
+    </div>
+  </main>
+
+  <main id="app" hidden>
+    <div class="contenedor">
+      <section class="intro">
+        <h1 class="titulo">Evaluaciones físicas</h1>
+        <p class="bajada" id="conclusion"></p>
+        <div class="chips">
+          <span class="chip" id="chip-ultima"></span>
+          <span class="chip chip-demo" id="chip-demo" hidden>Datos de ejemplo: no son jugadores reales</span>
+        </div>
+      </section>
+    </div>
+
+    <nav class="pestanas" aria-label="Secciones">
+      <div class="contenedor pestanas-fila" role="tablist">
+        <button class="pestana" role="tab" data-tab="resumen" aria-selected="true">Resumen</button>
+        <button class="pestana" role="tab" data-tab="resistencia" aria-selected="false">Resistencia</button>
+        <button class="pestana" role="tab" data-tab="saltos" aria-selected="false">Saltos</button>
+        <button class="pestana" role="tab" data-tab="fuerza" aria-selected="false">Fuerza</button>
+        <button class="pestana" role="tab" data-tab="jugador" aria-selected="false">Jugador</button>
+        <button class="pestana" role="tab" data-tab="leer" aria-selected="false">Cómo leerlo</button>
+      </div>
+    </nav>
+
+    <div class="contenedor paneles">
+      <!-- RESUMEN -->
+      <section class="panel" id="resumen" role="tabpanel">
+        <div class="mosaico" id="tarjetas-resumen"></div>
+
+        <article class="tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo" id="titulo-equipo">Cómo cambió el plantel</h2>
+              <p class="nota">Promedio de los jugadores que hicieron el test en la primera y en la última evaluación. Por eso cada fila tiene una cantidad distinta de jugadores.</p>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla" id="tabla-equipo">
+              <thead><tr>
+                <th>Test</th><th class="num">Jugadores</th><th class="num" id="th-antes">Antes</th><th class="num" id="th-despues">Después</th><th class="num">Cambio</th><th class="num">Mejoraron</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="tarjeta tarjeta-alerta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Para observar y tener en cuenta</h2>
+              <p class="nota">Jugadores que bajaron 5 % o más, y asimetrías entre piernas de 15 % o más (un valor orientativo, no un umbral validado). Tocá un jugador para ver su hoja.</p>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla tabla-clic" id="tabla-alertas">
+              <thead><tr><th>Jugador</th><th>Qué pasó</th><th>Test</th><th class="num">%</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="nota" id="sin-alertas" hidden>Nadie bajó 5 % o más ni tiene una asimetría alta.</p>
+        </article>
+      </section>
+
+      <!-- RESISTENCIA -->
+      <section class="panel" id="resistencia" role="tabpanel" hidden>
+        <article class="tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Resistencia intermitente · test 30-15 (VIFT)</h2>
+              <p class="nota">Velocidad final que alcanzó cada jugador, en km/h. Más a la derecha es mejor.</p>
+            </div>
+          </header>
+          <div class="leyenda" data-leyenda></div>
+          <div class="grafico" id="g-vift"></div>
+        </article>
+
+        <article class="tarjeta" id="intermitentes">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Distancias para los intermitentes</h2>
+              <p class="nota">Metros por pasada según la última VIFT de cada jugador, y cuántas canchas son (largos de 28 m, ida y vuelta sobre el largo de la cancha).</p>
+            </div>
+            <div class="control">
+              <label for="sel-pct">Intensidad</label>
+              <select id="sel-pct"></select>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla" id="tabla-intervalos">
+              <thead><tr><th>Jugador</th><th class="num">VIFT</th><th>Test de</th><th class="num">30" × 30"</th><th class="num">20" × 20"</th><th class="num">15" × 15"</th><th class="num">10" × 10"</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="nota">En ida y vuelta corta, los giros hacen perder tiempo: si a un jugador no le alcanza, bajá un 5 %. Si su test es viejo, conviene volver a evaluarlo.</p>
+        </article>
+      </section>
+
+      <!-- SALTOS -->
+      <section class="panel" id="saltos" role="tabpanel" hidden>
+        <article class="tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Altura de salto</h2>
+              <p class="nota">Mejor intento de cada fecha, en centímetros. Más a la derecha es mejor.</p>
+            </div>
+            <div class="control">
+              <label for="sel-salto">Salto</label>
+              <select id="sel-salto">
+                <option value="Salto CMJ">CMJ (con contramovimiento)</option>
+                <option value="Salto SJ">SJ (desde sentadilla)</option>
+                <option value="Salto Abalakov">Abalakov (con brazos)</option>
+              </select>
+            </div>
+          </header>
+          <div class="leyenda" data-leyenda></div>
+          <div class="grafico" id="g-salto"></div>
+        </article>
+        <article class="tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Asimetría entre piernas</h2>
+              <p class="nota" id="nota-asimetria">Diferencia entre el salto con la pierna derecha y con la izquierda, como porcentaje de la pierna más fuerte. La franja marca entre 10 y 15 %, una zona orientativa.</p>
+            </div>
+          </header>
+          <div class="grafico" id="g-asimetria"></div>
+        </article>
+      </section>
+
+      <!-- FUERZA -->
+      <section class="panel" id="fuerza" role="tabpanel" hidden>
+        <article class="tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Velocidad con la misma carga</h2>
+              <p class="nota">Velocidad media de la barra (m/s) con el mismo peso en cada fecha. Si mueve el mismo peso más rápido, está más fuerte. Más a la derecha es mejor.</p>
+            </div>
+            <div class="control">
+              <label for="sel-fuerza">Ejercicio</label>
+              <select id="sel-fuerza">
+                <option value="Sentadilla 80 kg">Sentadilla media 80 kg</option>
+                <option value="Sentadilla 100 kg">Sentadilla media 100 kg</option>
+                <option value="Press plano 60 kg">Press plano 60 kg</option>
+                <option value="Press plano 80 kg">Press plano 80 kg</option>
+              </select>
+            </div>
+          </header>
+          <div class="leyenda" data-leyenda></div>
+          <div class="grafico" id="g-fuerza"></div>
+          <p class="nota">Se usan las cargas que más jugadores repitieron en todas las fechas. Los valores marcados "A revisar" en la planilla no entran.</p>
+        </article>
+      </section>
+
+      <!-- JUGADOR -->
+      <section class="panel" id="jugador" role="tabpanel" hidden>
+        <div class="barra-jugador">
+          <div class="control">
+            <label for="sel-jugador">Jugador</label>
+            <select id="sel-jugador"></select>
+          </div>
+          <button type="button" class="boton" id="btn-presentar">Modo presentación</button>
+        </div>
+
+        <article class="hoja" id="hoja">
+          <header class="hoja-cabeza">
+            <img class="hoja-escudo" src="img/escudo.svg" alt="" width="56" height="70">
+            <div>
+              <p class="eyebrow">Club Unión de Santo Tomé · Primera · Evaluaciones físicas</p>
+              <h2 class="hoja-nombre" id="hoja-nombre"></h2>
+              <p class="bajada" id="hoja-resumen"></p>
+            </div>
+          </header>
+
+          <div class="mosaico" id="hoja-areas"></div>
+
+          <article class="tarjeta">
+            <h3 class="subtitulo">Tus distancias de entrenamiento</h3>
+            <p class="nota" id="hoja-int-nota"></p>
+            <div class="mosaico mosaico-4" id="hoja-intervalos"></div>
+          </article>
+
+          <article class="tarjeta">
+            <h3 class="subtitulo">Todos tus resultados</h3>
+            <div class="tabla-caja">
+              <table class="tabla" id="hoja-tabla"><thead></thead><tbody></tbody></table>
+            </div>
+          </article>
+
+          <div class="grilla">
+            <article class="tarjeta">
+              <h3 class="subtitulo">Perfil de fuerza · sentadilla media</h3>
+              <p class="nota">Velocidad (m/s) según el peso (kg). Una línea por fecha: si se corre hacia arriba, mueve el mismo peso más rápido.</p>
+              <div class="leyenda" data-leyenda></div>
+              <div class="grafico" id="g-perfil-s"></div>
+            </article>
+            <article class="tarjeta">
+              <h3 class="subtitulo">Perfil de fuerza · press plano</h3>
+              <p class="nota">Velocidad (m/s) según el peso (kg). Una línea por fecha.</p>
+              <div class="leyenda" data-leyenda></div>
+              <div class="grafico" id="g-perfil-p"></div>
+            </article>
+            <article class="tarjeta ancho">
+              <h3 class="subtitulo">Saltos</h3>
+              <p class="nota">Mejor intento de cada salto en cada fecha, en centímetros.</p>
+              <div class="leyenda" data-leyenda></div>
+              <div class="grafico" id="g-saltos-j"></div>
+            </article>
+          </div>
+        </article>
+      </section>
+
+      <!-- CÓMO LEERLO -->
+      <section class="panel" id="leer" role="tabpanel" hidden>
+        <div class="grilla">
+          <article class="tarjeta"><h2 class="subtitulo">Test 30-15 (VIFT)</h2><p>Carreras de ida y vuelta de 30 segundos con 15 de pausa, cada vez más rápidas. La VIFT es la velocidad de la última etapa completa. Mide la resistencia para repetir esfuerzos intensos, que es lo que pide un partido de básquet.</p></article>
+          <article class="tarjeta"><h2 class="subtitulo">Saltos: SJ, CMJ y Abalakov</h2><p>Los tres miden la potencia de piernas. El SJ arranca quieto desde abajo, el CMJ baja y sube en un solo movimiento y el Abalakov suma los brazos. Lo normal es que el CMJ sea un poco más alto que el SJ.</p></article>
+          <article class="tarjeta"><h2 class="subtitulo">Salto a una pierna y asimetría</h2><p>Comparar la pierna derecha con la izquierda muestra si una trabaja bastante más que la otra. No hay un valor que prediga lesiones: entre 10 y 15 % se usa como referencia para prestarle atención.</p></article>
+          <article class="tarjeta"><h2 class="subtitulo">Encoder: velocidad de la barra</h2><p>Un sensor mide a qué velocidad se mueve la barra. Con el mismo peso, más velocidad quiere decir más fuerza. Por eso se compara siempre al jugador con él mismo y con la misma carga.</p></article>
+          <article class="tarjeta"><h2 class="subtitulo">Distancias para intermitentes</h2><p>Salen de la VIFT: a un porcentaje de esa velocidad, cuántos metros se recorren en 30, 20, 15 o 10 segundos. Cada cancha es un largo de 28 metros.</p></article>
+          <article class="tarjeta"><h2 class="subtitulo">Por qué no todos aparecen en todo</h2><p>No todos los jugadores hicieron todos los tests en todas las fechas. Los promedios del equipo usan solo a los que tienen la primera y la última medición, para comparar lo mismo con lo mismo.</p></article>
+        </div>
+      </section>
+    </div>
+
+    <button type="button" class="boton boton-salir" id="btn-salir" hidden>Salir del modo presentación</button>
+  </main>
+
+  <p class="contenedor cargando" id="cargando" role="status">Cargando datos de la planilla…</p>
+
+  <footer class="contenedor pie">
+    <p>Área de rendimiento · Club Unión de Santo Tomé · Básquet</p>
+  </footer>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+
+  <script src="js/vendor/d3-7.9.0.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/calculos.js"></script>
+  <script src="js/graficos.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

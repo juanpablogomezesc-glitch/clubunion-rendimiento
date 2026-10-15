@@ -1,0 +1,41 @@
+# Conectar la página con la planilla: paso a paso
+
+Se hace **una sola vez**, en la computadora. El script va dentro de la planilla **DATOS PRIMERA - LIMPIO** (carpeta Club Union Santo Tome 🏀). No cambia ninguna pestaña: solo agrega una nueva, "Accesos".
+
+## Cómo funciona
+- La página no guarda datos. Cuando alguien la abre, le pide los datos a este script con una **clave**.
+- Cada persona que quieras que entre tiene una fila en la pestaña **Accesos** con su clave y su link (por ejemplo `.../clubunion-rendimiento/?c=AbCd...`). Quien no tiene el link no ve nada.
+- El script solo manda jugador, fecha, test y valor de las pestañas **Saltos**, **IFT** y **Encoder**. No manda nada de la hoja Plantel (nacimiento, peso) ni las notas.
+- Lo que está "Excluido" no se manda. En el encoder, lo que está "A revisar" llega sin velocidad, igual que en el resumen de la planilla.
+
+## 1. Pegar el código
+1. Abrí **DATOS PRIMERA - LIMPIO**.
+2. **Extensiones > Apps Script**.
+3. Abrí este link, que muestra el archivo como texto: `https://raw.githubusercontent.com/juanpablogomezesc-glitch/clubunion-rendimiento/main/apps-script/Codigo.gs`
+4. Clic en la página, **Ctrl + A**, **Ctrl + C**.
+5. En Apps Script: clic en el editor, **Ctrl + A**, **Suprimir**, **Ctrl + V**. Revisá que la última línea termine en `};`.
+6. Guardá (**Ctrl + S**).
+
+## 2. Crear las claves
+1. Arriba elegí la función **configurar** y tocá **Ejecutar**. Google pide permisos: elegí tu cuenta. Si aparece "Google no verificó esta aplicación", tocá **Configuración avanzada > Ir a … (no seguro)**. Es normal: el código es tuyo y solo usa esta planilla.
+2. Aparece la pestaña **Accesos** con una fila con tu nombre. Si querés más personas (el DT, el asistente), agregá una fila con el nombre de cada una.
+3. Elegí **generarClaves** y **Ejecutar**. Se completan la clave y el link de cada fila.
+
+## 3. (Opcional) Probar la lectura
+Elegí **probarLectura**, **Ejecutar** y mirá el registro de ejecución: dice cuántas filas leyó de cada pestaña y qué jugadores encontró.
+
+## 4. Publicarlo
+1. **Implementar > Nueva implementación**.
+2. Tipo: **Aplicación web**.
+3. **Ejecutar como: Yo**. **Quién tiene acceso: Cualquier persona**. (La clave es la que protege los datos.)
+4. **Implementar** y copiá la **URL de la aplicación web**. Termina en `/exec`.
+5. Pasame esa URL y la conecto con la página (va en `js/config.js`).
+
+## Cuando cargás una evaluación nueva
+No hay que hacer nada: cargala en Saltos, IFT o Encoder con el mismo formato y la página la muestra sola (tarda hasta 5 minutos, o tocá **Actualizar** en la página). Los cambios se calculan entre la primera y la última evaluación.
+
+## Si un link se filtra o alguien deja de tener acceso
+Borrá la clave de esa fila. El link deja de funcionar enseguida. Si querés darle uno nuevo, ejecutá **generarClaves**.
+
+## Si cambio el código más adelante
+Pegá la versión nueva, guardá y hacé **Implementar > Administrar implementaciones > editar (lápiz) > Versión: Nueva versión**. La URL no cambia.
