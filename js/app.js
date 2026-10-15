@@ -326,7 +326,8 @@
       guardar(llave, JSON.stringify({ clave, datos: j.datos, generado: j.generado }));
       iniciar(j.datos, j.generado);
     } catch (e) {
-      if (!M) { $('#cargando').textContent = 'No se pudieron cargar los datos. Revisá la conexión y recargá la página.'; $('#cargando').hidden = false; }
+      const detalle = e instanceof SyntaxError ? 'el script de Google no devolvió datos (revisá que la implementación tenga acceso para "Cualquier persona")' : (e && e.message) || 'sin conexión';
+      if (!M) { $('#cargando').textContent = `No se pudieron cargar los datos: ${detalle}. Recargá la página para reintentar.`; $('#cargando').hidden = false; }
       else $('#actualizado').textContent = 'No se pudo actualizar: se muestran los últimos datos guardados';
     } finally {
       boton.disabled = false;
