@@ -165,15 +165,16 @@ const convertidos_ = (v) => String(v).split('/').map(Number);
  */
 function parsearPlanilla_(texto, equipo) {
   equipo = normalizar_(equipo || EQUIPO);
-  const t = String(texto || '').replace(/\\\*/g, '*').replace(/\s+/g, ' ');
+  // Google Docs escribe el signo menos del +/- como "−" o "–": se pasa a "-"
+  const t = String(texto || '').replace(/\\\*/g, '*').replace(/[\u2212\u2013\u2014]/g, '-').replace(/\s+/g, ' ');
   const entrenadores = [];
   for (let i = t.indexOf('Entrenador:'); i >= 0; i = t.indexOf('Entrenador:', i + 1)) entrenadores.push(i);
-  const FILA = /(\d{1,2}) (\*?)([^\d:,]+,[^\d:]+?) (\d{1,3}):(\d{2})((?: -?\d+(?:\/\d+)?){19})/g;
+  const FILA = /(\d{1,2}) (\*?)([^\d:,]+,[^\d:]+?) (\d{1,3}):(\d{2})((?: [-+]?\d+(?:\/\d+)?){19})/g;
   const filas = [];
   for (let m; (m = FILA.exec(t));) filas.push({ pos: m.index, m });
   // nombres de los equipos: el primero sale del título, el segundo está entre los TOTALES del primero y su "Entrenador:"
   const titulo = /Estad[ií]sticas ((?:(?!Estad[ií]sticas).)+?) vs /.exec(t);
-  const totales = /TOTALES \d{1,3}:\d{2}(?: -?\d+(?:\/\d+)?){19}/.exec(t);
+  const totales = /TOTALES \d{1,3}:\d{2}(?: [-+]?\d+(?:\/\d+)?){19}/.exec(t);
   const equipos = [titulo ? titulo[1].trim() : '', totales && entrenadores[1] ? t.slice(totales.index + totales[0].length, entrenadores[1]).trim() : ''];
   const propio = equipos.findIndex((e) => normalizar_(e).indexOf(equipo) >= 0);
   if (propio < 0 || !entrenadores[propio]) return { equipos, rival: '', local: null, jugadores: [] };

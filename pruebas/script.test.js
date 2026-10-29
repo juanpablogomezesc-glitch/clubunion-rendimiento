@@ -136,3 +136,11 @@ test('fecha del partido: el último "Partido" de Sesiones en la semana antes de 
   assert.equal(S.fechaPartido_('2026-10-29', ['2026-10-18', '2026-10-25'], new Set(['2026-10-25'])), null);
   assert.equal(S.fechaPartido_('2026-10-29', [], new Set()), null);
 });
+
+test('planilla de la CAP: +/- negativo con el signo menos que usa Google Docs', () => {
+  const texto = planilla.replace(' 4 0 1 -15', ' 4 0 1 −15').replace(' 6 14 20', ' 6 14 –20');
+  const p = S.parsearPlanilla_(texto, 'UNION DE SANTO TOME');
+  assert.equal(p.jugadores.length, 6);
+  assert.equal(p.jugadores[1].masMenos, -15);
+  assert.equal(p.jugadores[2].masMenos, -20);
+});
