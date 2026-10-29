@@ -165,8 +165,10 @@ const convertidos_ = (v) => String(v).split('/').map(Number);
  */
 function parsearPlanilla_(texto, equipo) {
   equipo = normalizar_(equipo || EQUIPO);
-  // Google Docs escribe el signo menos del +/- como "−" o "–": se pasa a "-"
-  const t = String(texto || '').replace(/\\\*/g, '*').replace(/[\u2212\u2013\u2014]/g, '-').replace(/\s+/g, ' ');
+  // La CAP escribe los negativos con un guion invisible (U+00AD) y a veces Docs usa "−" o "–": todo pasa a "-".
+  // El título de la columna "+/-" a veces queda en medio de la primera fila: se saca.
+  const t = String(texto || '').replace(/\\\*/g, '*').replace(/[\u00ad\u2212\u2013\u2014]/g, '-')
+    .replace(/\+\/-?/g, ' ').replace(/\s+/g, ' ');
   const entrenadores = [];
   for (let i = t.indexOf('Entrenador:'); i >= 0; i = t.indexOf('Entrenador:', i + 1)) entrenadores.push(i);
   const FILA = /(\d{1,2}) (\*?)([^\d:,]+,[^\d:]+?) (\d{1,3}):(\d{2})((?: [-+]?\d+(?:\/\d+)?){19})/g;
@@ -175,7 +177,11 @@ function parsearPlanilla_(texto, equipo) {
   // nombres de los equipos: el primero sale del título, el segundo está entre los TOTALES del primero y su "Entrenador:"
   const titulo = /Estad[ií]sticas ((?:(?!Estad[ií]sticas).)+?) vs /.exec(t);
   const totales = /TOTALES \d{1,3}:\d{2}(?: [-+]?\d+(?:\/\d+)?){19}/.exec(t);
-  const equipos = [titulo ? titulo[1].trim() : '', totales && entrenadores[1] ? t.slice(totales.index + totales[0].length, entrenadores[1]).trim() : ''];
+  const limpiar = (x) => x.replace(/^[-\s]+|[-\s]+$/g, '');
+  // en el PDF original el título separa con guiones: "Estadísticas - LOCAL vs VISITANTE - torneo"
+  const ambos = /Estad[ií]sticas[ -]*((?:(?!Estad[ií]sticas).)+?) vs (.+?) - /.exec(t);
+  const equipos = ambos ? [limpiar(ambos[1]), limpiar(ambos[2])]
+    : [titulo ? limpiar(titulo[1]) : '', totales && entrenadores[1] ? limpiar(t.slice(totales.index + totales[0].length, entrenadores[1])) : ''];
   const propio = equipos.findIndex((e) => normalizar_(e).indexOf(equipo) >= 0);
   if (propio < 0 || !entrenadores[propio]) return { equipos, rival: '', local: null, jugadores: [] };
   const desde = entrenadores[propio], hasta = entrenadores[propio + 1] || t.length;

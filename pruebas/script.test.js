@@ -144,3 +144,15 @@ test('planilla de la CAP: +/- negativo con el signo menos que usa Google Docs', 
   assert.equal(p.jugadores[1].masMenos, -15);
   assert.equal(p.jugadores[2].masMenos, -20);
 });
+
+test('planilla de la CAP: negativos con guion invisible (U+00AD) y título con separadores, como el PDF original', () => {
+  const texto = planilla
+    .replace('Estadísticas UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA MM', 'Estadísticas ­ UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA ­ MM ­')
+    .replace(' 4 0 1 -15', ' 4 0 ­1 ­15')
+    .replace('VAL +/', 'VAL +/­');
+  const p = S.parsearPlanilla_(texto, 'UNION DE SANTO TOME');
+  assert.deepEqual(p.equipos, ['UNION DE SANTO TOME', 'EQUIPO RIVAL DE PRUEBA']);
+  assert.equal(p.jugadores.length, 6);
+  assert.equal(p.jugadores[1].valoracion, -1);
+  assert.equal(p.jugadores[1].masMenos, -15);
+});
