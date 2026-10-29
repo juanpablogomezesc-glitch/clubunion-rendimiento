@@ -44,8 +44,8 @@ Después, en el día a día:
 - Los jugadores completan el formulario al terminar. Las respuestas caen solas en la pestaña "Respuestas RPE".
 - Si cambia el plantel, editá la pestaña **Plantel** de CARGA PRIMERA (y la columna en Partidos) y ejecutá **actualizarFormulario**.
 
-## Minutos desde la planilla de la CAP (PDF)
-Los minutos de los partidos (y las estadísticas: puntos, tiros, rebotes, etc.) se pueden cargar solos desde el PDF de estadísticas de la app de la CAP.
+## Minutos desde la planilla de la CABB (PDF)
+Los minutos de los partidos (y las estadísticas: puntos, tiros, rebotes, etc.) se pueden cargar solos desde el PDF de estadísticas de la app de la CABB.
 
 Una sola vez:
 1. En el editor de Apps Script, a la izquierda, **Servicios** (el **+**) > **Drive API** > **Agregar**. Sirve para convertir el PDF en texto.
@@ -60,7 +60,7 @@ Detalle de lo que pasa:
 - Subí el PDF a la carpeta **Planillas de partido (PDF)** (desde el celular con la app de Drive).
 - En menos de una hora aparecen los minutos en **Partidos** y todas las métricas en la pestaña **Estadísticas**.
 
-Si un nombre de la CAP no coincide con el plantel (por ejemplo "BARONI, JUANSE"), corregilo en la pestaña **Equivalencias**: columna A como figura en la planilla de la CAP, columna B el nombre de tu plantel. Un jugador que no estaba en el plantel se agrega solo (revisá las tildes del nombre).
+Si un nombre de la CABB no coincide con el plantel (por ejemplo "BARONI, JUANSE"), corregilo en la pestaña **Equivalencias**: columna A como figura en la planilla de la CABB, columna B el nombre de tu plantel. Un jugador que no estaba en el plantel se agrega solo (revisá las tildes del nombre).
 
 ## Cuando cargás una evaluación nueva
 No hay que hacer nada: cargala en Saltos, IFT o Encoder con el mismo formato y la página la muestra sola (tarda hasta 5 minutos, o tocá **Actualizar** en la página). Los cambios se calculan entre la primera y la última evaluación.

@@ -88,7 +88,7 @@ test('RPE: toma el número de la opción y la fecha de la sesión si la completa
 const fs = require('fs');
 const planilla = fs.readFileSync(require('path').join(__dirname, 'fixtures/planilla-cap.txt'), 'utf8');
 
-test('planilla de la CAP: equipos, rival y solo las filas de Unión', () => {
+test('planilla de la CABB: equipos, rival y solo las filas de Unión', () => {
   const p = S.parsearPlanilla_(planilla, 'UNION DE SANTO TOME');
   assert.deepEqual(p.equipos, ['UNION DE SANTO TOME', 'EQUIPO RIVAL DE PRUEBA']);
   assert.equal(p.rival, 'EQUIPO RIVAL DE PRUEBA');
@@ -104,7 +104,7 @@ test('planilla de la CAP: equipos, rival y solo las filas de Unión', () => {
   assert.equal(p.jugadores[5].minutos, 0);
 });
 
-test('planilla de la CAP: también con los asteriscos escapados y Unión de visitante', () => {
+test('planilla de la CABB: también con los asteriscos escapados y Unión de visitante', () => {
   const visitante = planilla.replace(/\*/g, '\\*')
     .replace('Estadísticas UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA', 'Estadísticas EQUIPO RIVAL DE PRUEBA vs UNION DE SANTO TOME');
   // en la planilla de visitante, el primer bloque es el del local
@@ -121,7 +121,7 @@ test('planilla de la CAP: también con los asteriscos escapados y Unión de visi
   assert.equal(p.jugadores[0].titular, true);
 });
 
-test('nombres de la CAP contra el plantel', () => {
+test('nombres de la CABB contra el plantel', () => {
   const plantel = ['Leandro Durizotto', 'Lucas Nanzer', 'Miyen Federico Godoy', 'Marcos Quinteros', 'Juan Sebastián Varoni', 'Tomás Peralta', 'Franco Peralta'];
   assert.equal(S.emparejar_('DURIZOTTO, LEANDRO IVALDI', plantel, {}), 'Leandro Durizotto');
   assert.equal(S.emparejar_('NANZER, LUCA SALVADOR', plantel, {}), 'Lucas Nanzer');
@@ -139,7 +139,7 @@ test('fecha del partido: el último "Partido" de Sesiones en la semana antes de 
   assert.equal(S.fechaPartido_('2026-10-29', [], new Set()), null);
 });
 
-test('planilla de la CAP: +/- negativo con el signo menos que usa Google Docs', () => {
+test('planilla de la CABB: +/- negativo con el signo menos que usa Google Docs', () => {
   const texto = planilla.replace(' 4 0 1 -15', ' 4 0 1 −15').replace(' 6 14 20', ' 6 14 –20');
   const p = S.parsearPlanilla_(texto, 'UNION DE SANTO TOME');
   assert.equal(p.jugadores.length, 6);
@@ -147,7 +147,7 @@ test('planilla de la CAP: +/- negativo con el signo menos que usa Google Docs', 
   assert.equal(p.jugadores[2].masMenos, -20);
 });
 
-test('planilla de la CAP: negativos con guion invisible (U+00AD) y título con separadores, como el PDF original', () => {
+test('planilla de la CABB: negativos con guion invisible (U+00AD) y título con separadores, como el PDF original', () => {
   const texto = planilla
     .replace('Estadísticas UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA MM', 'Estadísticas ­ UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA ­ MM ­')
     .replace(' 4 0 1 -15', ' 4 0 ­1 ­15')

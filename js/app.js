@@ -241,7 +241,7 @@
     e.target.value = '';
     if (!archivo) return;
     if (demo) { estado.textContent = 'En la vista de ejemplo no se suben archivos.'; return; }
-    if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') { estado.textContent = 'Tiene que ser el PDF de estadísticas de la CAP.'; return; }
+    if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') { estado.textContent = 'Tiene que ser el PDF de estadísticas de la CABB.'; return; }
     $('#btn-pdf').textContent = 'Leyendo la planilla…';
     estado.textContent = 'Subiendo y leyendo el PDF. Tarda unos segundos.';
     try {

@@ -14,7 +14,7 @@ const SEGUNDOS_EN_MEMORIA = 300;            // una consulta repetida en 5 minuto
 const SEGUNDOS_MINIMOS_ENTRE_LECTURAS = 30; // el botón "Actualizar" no lee la planilla más de una vez cada 30 segundos
 const ID_CARGA = '1I0zUBZIcicYVUmd854eoCoBwNfNuO-43VO1zoi0cPyQ'; // planilla "CARGA PRIMERA" (sesiones, partidos y RPE)
 const CARPETA_PDF = '1WmIe9vu4_c6YkQMtrkreMwSKis__Nq1K';  // carpeta "Planillas de partido (PDF)"
-const EQUIPO = 'UNION DE SANTO TOME';                       // cómo figura el club en la planilla de la CAP
+const EQUIPO = 'UNION DE SANTO TOME';                       // cómo figura el club en la planilla de la CABB
 // ======================
 
 const HOJA_ACCESOS = 'Accesos';
@@ -155,18 +155,18 @@ function leerRpe_(filas, zona) {
   return out;
 }
 
-// ---------- Planillas de partido de la CAP (PDF) ----------
+// ---------- Planillas de partido de la CABB (PDF) ----------
 
 /** "4/11" → [4, 11] */
 const convertidos_ = (v) => String(v).split('/').map(Number);
 
 /**
- * Texto de la planilla de estadísticas de la CAP → equipos, rival y la fila de cada jugador de EQUIPO.
+ * Texto de la planilla de estadísticas de la CABB → equipos, rival y la fila de cada jugador de EQUIPO.
  * Cada fila: número, * si fue titular, "APELLIDO, NOMBRE", minutos (mm:ss) y 19 valores.
  */
 function parsearPlanilla_(texto, equipo) {
   equipo = normalizar_(equipo || EQUIPO);
-  // La CAP escribe los negativos con un guion invisible (U+00AD) y a veces Docs usa "−" o "–": todo pasa a "-".
+  // La CABB escribe los negativos con un guion invisible (U+00AD) y a veces Docs usa "−" o "–": todo pasa a "-".
   // El título de la columna "+/-" a veces queda en medio de la primera fila: se saca.
   const t = String(texto || '').replace(/\\\*/g, '*').replace(/[\u00ad\u2212\u2013\u2014]/g, '-')
     .replace(/\+\/-?/g, ' ').replace(/\s+/g, ' ');
@@ -294,7 +294,7 @@ function novedades_(ss, zona) {
   const out = [];
   const plantel = ss.getSheetByName('Plantel');
   if (plantel) plantel.getDataRange().getValues().slice(1).forEach((f) => {
-    if (/agregado desde una planilla/i.test(String(f[2]))) out.push({ fecha: '', texto: `${nombre_(f[0])} se agregó al plantel desde una planilla de la CAP. Si el nombre necesita tildes, corregilo en la pestaña Plantel.` });
+    if (/agregado desde una planilla/i.test(String(f[2]))) out.push({ fecha: '', texto: `${nombre_(f[0])} se agregó al plantel desde una planilla de la CABB. Si el nombre necesita tildes, corregilo en la pestaña Plantel.` });
   });
   const est = ss.getSheetByName('Estadísticas');
   if (est) {
@@ -409,7 +409,7 @@ function generarClaves() {
   }
 }
 
-// ---------- Lectura de los PDF de la CAP ----------
+// ---------- Lectura de los PDF de la CABB ----------
 
 const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota'];
 
@@ -481,7 +481,7 @@ function procesarPlanillas() {
   const sesionesNuevas = completarSesiones_(ss, zona);
   if (sesionesNuevas) Logger.log(`Se agregaron ${sesionesNuevas} sesiones a partir del formulario.`);
   const est = hojaConTitulos_(ss, 'Estadísticas', TITULOS_ESTADISTICAS);
-  const eqv = hojaConTitulos_(ss, 'Equivalencias', ['Nombre en la planilla CAP', 'Jugador']);
+  const eqv = hojaConTitulos_(ss, 'Equivalencias', ['Nombre en la planilla CABB', 'Jugador']);
   const hPlantel = ss.getSheetByName('Plantel'), hPartidos = ss.getSheetByName('Partidos');
   const colArchivo = TITULOS_ESTADISTICAS.indexOf('Archivo');
   const leidos = est.getDataRange().getValues().slice(1);
@@ -497,8 +497,8 @@ function procesarPlanillas() {
     const p = parsearPlanilla_(textoDePdf_(archivo));
     const subido = Utilities.formatDate(archivo.getDateCreated(), zona, 'yyyy-MM-dd');
     if (!p.jugadores.length) {
-      est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `No se pudo leer "${archivo.getName()}": ¿es la planilla de la CAP con ${EQUIPO}?`]);
-      resumen.push({ archivo: archivo.getName(), error: `No se pudo leer: ¿es la planilla de estadísticas de la CAP de un partido de ${EQUIPO}?` });
+      est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `No se pudo leer "${archivo.getName()}": ¿es la planilla de la CABB con ${EQUIPO}?`]);
+      resumen.push({ archivo: archivo.getName(), error: `No se pudo leer: ¿es la planilla de estadísticas de la CABB de un partido de ${EQUIPO}?` });
       continue;
     }
     const fechaSesion = fechaPartido_(subido, fechasPartido, usadas);
