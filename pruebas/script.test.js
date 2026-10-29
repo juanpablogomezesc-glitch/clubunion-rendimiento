@@ -82,3 +82,57 @@ test('RPE: toma el número de la opción y la fecha de la sesión si la completa
   assert.equal(r[1].fecha, '2026-11-02');
   assert.equal(r[1].rpe, 8);
 });
+
+const fs = require('fs');
+const planilla = fs.readFileSync(require('path').join(__dirname, 'fixtures/planilla-cap.txt'), 'utf8');
+
+test('planilla de la CAP: equipos, rival y solo las filas de Unión', () => {
+  const p = S.parsearPlanilla_(planilla, 'UNION DE SANTO TOME');
+  assert.deepEqual(p.equipos, ['UNION DE SANTO TOME', 'EQUIPO RIVAL DE PRUEBA']);
+  assert.equal(p.rival, 'EQUIPO RIVAL DE PRUEBA');
+  assert.equal(p.local, true);
+  assert.equal(p.jugadores.length, 6);
+  const [a, b] = p.jugadores;
+  assert.deepEqual([a.nombre, a.titular, a.minutos, a.puntos, a.t2c, a.t2i, a.t3c, a.t3i, a.tlc, a.tli, a.rebTot, a.valoracion, a.masMenos],
+    ['PEREZ, JUAN', true, 37.5, 26, 4, 11, 4, 7, 6, 10, 5, 16, 19]);
+  assert.equal(b.titular, false);
+  assert.equal(b.masMenos, -15);
+  const cap = p.jugadores.find((j) => j.capitan);
+  assert.equal(cap.nombre, 'LOPEZ, MIGUEL ANGEL');
+  assert.equal(p.jugadores[5].minutos, 0);
+});
+
+test('planilla de la CAP: también con los asteriscos escapados y Unión de visitante', () => {
+  const visitante = planilla.replace(/\*/g, '\\*')
+    .replace('Estadísticas UNION DE SANTO TOME vs EQUIPO RIVAL DE PRUEBA', 'Estadísticas EQUIPO RIVAL DE PRUEBA vs UNION DE SANTO TOME');
+  // en la planilla de visitante, el primer bloque es el del local
+  const bloques = visitante.split(/\n(?=EQUIPO RIVAL DE PRUEBA\n\nEntrenador)/);
+  const union = bloques[0].slice(bloques[0].indexOf('UNION DE SANTO TOME\n\nEntrenador'), bloques[0].lastIndexOf('TOTALES'));
+  const totalesU = bloques[0].slice(bloques[0].lastIndexOf('TOTALES')).split('\n')[0];
+  const rival = bloques[1].slice(0, bloques[1].indexOf('CONFEDER'));
+  const cabecera = bloques[0].slice(0, bloques[0].indexOf('UNION DE SANTO TOME\n\nEntrenador'));
+  const texto = cabecera + rival.replace('UNION DE SANTO TOME', '') + '\n\n' + union + totalesU + '\n\nCONFEDERACIÓN';
+  const p = S.parsearPlanilla_(texto, 'UNION DE SANTO TOME');
+  assert.equal(p.local, false);
+  assert.equal(p.rival, 'EQUIPO RIVAL DE PRUEBA');
+  assert.equal(p.jugadores.length, 6);
+  assert.equal(p.jugadores[0].titular, true);
+});
+
+test('nombres de la CAP contra el plantel', () => {
+  const plantel = ['Leandro Durizotto', 'Lucas Nanzer', 'Miyen Federico Godoy', 'Marcos Quinteros', 'Juan Sebastián Varoni', 'Tomás Peralta', 'Franco Peralta'];
+  assert.equal(S.emparejar_('DURIZOTTO, LEANDRO IVALDI', plantel, {}), 'Leandro Durizotto');
+  assert.equal(S.emparejar_('NANZER, LUCA SALVADOR', plantel, {}), 'Lucas Nanzer');
+  assert.equal(S.emparejar_('GODOY, MIYEN FEDERICO', plantel, {}), 'Miyen Federico Godoy');
+  assert.equal(S.emparejar_('VARONI, JUAN SEBASTIAN', plantel, {}), 'Juan Sebastián Varoni');
+  assert.equal(S.emparejar_('PERALTA, TOMAS', plantel, {}), 'Tomás Peralta'); // dos Peralta: decide el nombre
+  assert.equal(S.emparejar_('LEONI, TOMAS', plantel, {}), null);
+  assert.equal(S.emparejar_('BARONI, JUANSE', plantel, { 'baroni, juanse': 'Juan Sebastián Varoni' }), 'Juan Sebastián Varoni');
+  assert.equal(S.nombreNuevo_('WELSCHEN, SANTINO'), 'Santino Welschen');
+});
+
+test('fecha del partido: el último "Partido" de Sesiones en la semana antes de subir el PDF', () => {
+  assert.equal(S.fechaPartido_('2026-10-29', ['2026-10-18', '2026-10-25'], new Set()), '2026-10-25');
+  assert.equal(S.fechaPartido_('2026-10-29', ['2026-10-18', '2026-10-25'], new Set(['2026-10-25'])), null);
+  assert.equal(S.fechaPartido_('2026-10-29', [], new Set()), null);
+});

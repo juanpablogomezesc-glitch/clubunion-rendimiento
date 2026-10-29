@@ -181,14 +181,14 @@
       if (j.relacion != null) rel.append(el('span', 'pill ' + j.estado.tono, `${nf(j.relacion, 2)} · ${j.estado.nombre}`));
       else rel.append(el('span', 'neutro', 'Faltan semanas'));
       const ult = el('td', 'num');
-      if (j.ultimoPartido) ult.append(`${j.ultimoPartido.minutos} min`, el('span', 'sub', `${j.ultimoPartido.rival} · ${fechaCorta(j.ultimoPartido.fecha)}`));
+      if (j.ultimoPartido) ult.append(`${nf(j.ultimoPartido.minutos, 0)} min`, el('span', 'sub', `${j.ultimoPartido.rival} · ${fechaCorta(j.ultimoPartido.fecha)}`));
       else ult.append(el('span', 'neutro', '—'));
       tr.append(el('td', null, j.jugador),
         el('td', 'num' + (j.aguda == null ? ' neutro' : ''), j.aguda != null ? nf(j.aguda, 0) : '—'),
         el('td', 'num' + (j.cronica == null ? ' neutro' : ''), j.cronica != null ? nf(j.cronica, 0) : '—'),
         rel,
         el('td', 'num' + (j.rpe7 == null ? ' neutro' : ''), j.rpe7 != null ? nf(j.rpe7, 1) : '—'),
-        el('td', 'num', j.minutosTotal ? `${j.minutosTotal}` : '—'),
+        el('td', 'num', j.minutosTotal ? nf(j.minutosTotal, 0) : '—'),
         ult);
       return tr;
     }));
@@ -201,7 +201,7 @@
     if (caja.hidden) return;
     const partes = [];
     if (d.aguda != null) partes.push(`Últimos 7 días: ${nf(d.aguda, 0)} UA${d.relacion != null ? ` (${nf(d.relacion, 2)} veces tu promedio semanal)` : ''}.`);
-    if (d.partidosJugados) partes.push(`Minutos en partidos: ${d.minutosTotal} en ${d.partidosJugados} ${d.partidosJugados === 1 ? 'partido' : 'partidos'} (promedio ${nf(d.minutosPromedio, 1)}).`);
+    if (d.partidosJugados) partes.push(`Minutos en partidos: ${nf(d.minutosTotal, 0)} en ${d.partidosJugados} ${d.partidosJugados === 1 ? 'partido' : 'partidos'} (promedio ${nf(d.minutosPromedio, 1)}).`);
     $('#hoja-carga-nota').textContent = partes.join(' ') || 'RPE × minutos de cada semana, de lunes a domingo.';
     G.semanas($('#g-carga-j'), d.semanal, { vacio: 'Todavía no respondiste el formulario en estas semanas.' });
   }

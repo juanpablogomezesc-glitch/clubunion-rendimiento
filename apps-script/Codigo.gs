@@ -13,6 +13,8 @@ const PAGINA = 'https://juanpablogomezesc-glitch.github.io/clubunion-rendimiento
 const SEGUNDOS_EN_MEMORIA = 300;            // una consulta repetida en 5 minutos no vuelve a leer la planilla
 const SEGUNDOS_MINIMOS_ENTRE_LECTURAS = 30; // el botón "Actualizar" no lee la planilla más de una vez cada 30 segundos
 const ID_CARGA = '1I0zUBZIcicYVUmd854eoCoBwNfNuO-43VO1zoi0cPyQ'; // planilla "CARGA PRIMERA" (sesiones, partidos y RPE)
+const CARPETA_PDF = '1WmIe9vu4_c6YkQMtrkreMwSKis__Nq1K';  // carpeta "Planillas de partido (PDF)"
+const EQUIPO = 'UNION DE SANTO TOME';                       // cómo figura el club en la planilla de la CAP
 // ======================
 
 const HOJA_ACCESOS = 'Accesos';
@@ -152,6 +154,74 @@ function leerRpe_(filas, zona) {
   return out;
 }
 
+// ---------- Planillas de partido de la CAP (PDF) ----------
+
+/** "4/11" → [4, 11] */
+const convertidos_ = (v) => String(v).split('/').map(Number);
+
+/**
+ * Texto de la planilla de estadísticas de la CAP → equipos, rival y la fila de cada jugador de EQUIPO.
+ * Cada fila: número, * si fue titular, "APELLIDO, NOMBRE", minutos (mm:ss) y 19 valores.
+ */
+function parsearPlanilla_(texto, equipo) {
+  equipo = normalizar_(equipo || EQUIPO);
+  const t = String(texto || '').replace(/\\\*/g, '*').replace(/\s+/g, ' ');
+  const entrenadores = [];
+  for (let i = t.indexOf('Entrenador:'); i >= 0; i = t.indexOf('Entrenador:', i + 1)) entrenadores.push(i);
+  const FILA = /(\d{1,2}) (\*?)([^\d:,]+,[^\d:]+?) (\d{1,3}):(\d{2})((?: -?\d+(?:\/\d+)?){19})/g;
+  const filas = [];
+  for (let m; (m = FILA.exec(t));) filas.push({ pos: m.index, m });
+  // nombres de los equipos: el primero sale del título, el segundo está entre los TOTALES del primero y su "Entrenador:"
+  const titulo = /Estad[ií]sticas ((?:(?!Estad[ií]sticas).)+?) vs /.exec(t);
+  const totales = /TOTALES \d{1,3}:\d{2}(?: -?\d+(?:\/\d+)?){19}/.exec(t);
+  const equipos = [titulo ? titulo[1].trim() : '', totales && entrenadores[1] ? t.slice(totales.index + totales[0].length, entrenadores[1]).trim() : ''];
+  const propio = equipos.findIndex((e) => normalizar_(e).indexOf(equipo) >= 0);
+  if (propio < 0 || !entrenadores[propio]) return { equipos, rival: '', local: null, jugadores: [] };
+  const desde = entrenadores[propio], hasta = entrenadores[propio + 1] || t.length;
+  const jugadores = filas.filter((f) => f.pos > desde && f.pos < hasta).map(({ m }) => {
+    const v = m[6].trim().split(' ');
+    const [c2, i2] = convertidos_(v[1]), [c3, i3] = convertidos_(v[3]), [cl, il] = convertidos_(v[5]);
+    return {
+      numero: +m[1], titular: m[2] === '*', capitan: /\(CAP\)/i.test(m[3]),
+      nombre: m[3].replace(/\(CAP\)/i, '').trim(),
+      minutos: Math.round((+m[4] + +m[5] / 60) * 10) / 10,
+      puntos: +v[0], t2c: c2, t2i: i2, t3c: c3, t3i: i3, tlc: cl, tli: il,
+      rebDef: +v[7], rebOf: +v[8], rebTot: +v[9], asistencias: +v[10], recuperos: +v[11], perdidas: +v[12],
+      tapas: +v[13], tapasRecibidas: +v[14], faltas: +v[15], faltasRecibidas: +v[16], valoracion: +v[17], masMenos: +v[18],
+    };
+  });
+  return { equipos, rival: equipos[1 - propio], local: propio === 0, jugadores };
+}
+
+/** "DURIZOTTO, LEANDRO IVALDI" → "Leandro Durizotto" del plantel. Primero la tabla de equivalencias, después apellido + nombre. */
+function emparejar_(nombreCap, plantel, equivalencias) {
+  const n = normalizar_(nombreCap);
+  if (equivalencias && equivalencias[n]) return equivalencias[n];
+  const palabras = (x) => normalizar_(x).replace(/[^a-z ]/g, ' ').split(' ').filter(Boolean);
+  const [ap, nom] = n.split(',');
+  const aps = palabras(ap || ''), noms = palabras(nom || '');
+  const mismos = plantel.filter((j) => { const w = palabras(j); return aps.length && aps.every((a) => w.includes(a)); });
+  const conNombre = mismos.filter((j) => noms.length && palabras(j).some((w) => !aps.includes(w) && w.slice(0, 3) === noms[0].slice(0, 3)));
+  if (conNombre.length === 1) return conNombre[0];
+  if (mismos.length === 1) return mismos[0];
+  return null;
+}
+
+/** "LEONI, TOMAS" → "Tomas Leoni" (para un jugador que no estaba en el plantel). */
+function nombreNuevo_(nombreCap) {
+  const titulo = (x) => x.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase()).trim();
+  const [ap, nom] = String(nombreCap).split(',');
+  return [titulo((nom || '').trim().split(/\s+/)[0] || ''), titulo(ap || '')].filter(Boolean).join(' ');
+}
+
+/** La planilla no trae la fecha: es la del último "Partido" de Sesiones en la semana antes de subir el PDF. */
+function fechaPartido_(subido, fechasPartido, usadas) {
+  const d = new Date(subido + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 6);
+  const desde = d.toISOString().slice(0, 10);
+  const c = fechasPartido.filter((f) => f >= desde && f <= subido && !(usadas && usadas.has(f))).sort();
+  return c.length ? c[c.length - 1] : null;
+}
+
 // ---------- Planilla ----------
 
 function leerTodo_() {
@@ -253,6 +323,121 @@ function generarClaves() {
   }
 }
 
+// ---------- Lectura de los PDF de la CAP ----------
+
+const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota'];
+
+function hojaConTitulos_(ss, nombre, titulos) {
+  let h = ss.getSheetByName(nombre);
+  if (!h) {
+    h = ss.insertSheet(nombre);
+    h.getRange(1, 1, 1, titulos.length).setValues([titulos]).setFontWeight('bold');
+    h.setFrozenRows(1);
+  }
+  return h;
+}
+
+/** Convierte el PDF en texto con Google Docs (necesita el servicio "Drive API" activado en el editor). */
+function textoDePdf_(archivo) {
+  if (typeof Drive === 'undefined') throw new Error('Falta activar el servicio Drive API (ver INSTRUCCIONES.md).');
+  const copia = Drive.Files.copy({ name: 'tmp ' + archivo.getName(), title: 'tmp ' + archivo.getName(), mimeType: MimeType.GOOGLE_DOCS }, archivo.getId());
+  try {
+    return DocumentApp.openById(copia.id).getBody().getText();
+  } finally {
+    DriveApp.getFileById(copia.id).setTrashed(true);
+  }
+}
+
+/**
+ * Lee los PDF nuevos de la carpeta "Planillas de partido (PDF)" y completa las pestañas Estadísticas y Partidos
+ * de CARGA PRIMERA. Un PDF ya leído no se vuelve a leer. Se ejecuta solo cada hora (ver activarLecturaAutomatica).
+ */
+function procesarPlanillas() {
+  const ss = SpreadsheetApp.openById(ID_CARGA), zona = ss.getSpreadsheetTimeZone();
+  const est = hojaConTitulos_(ss, 'Estadísticas', TITULOS_ESTADISTICAS);
+  const eqv = hojaConTitulos_(ss, 'Equivalencias', ['Nombre en la planilla CAP', 'Jugador']);
+  const hPlantel = ss.getSheetByName('Plantel'), hPartidos = ss.getSheetByName('Partidos');
+  const colArchivo = TITULOS_ESTADISTICAS.indexOf('Archivo');
+  const leidos = est.getDataRange().getValues().slice(1);
+  const procesados = new Set(leidos.map((f) => String(f[colArchivo])));
+  const usadas = new Set(leidos.map((f) => fecha_(f[0], zona)).filter(Boolean));
+  const fechasPartido = leerSesiones_(ss.getSheetByName('Sesiones').getDataRange().getValues(), zona).filter((x) => x.tipo === 'Partido').map((x) => x.fecha);
+
+  const archivos = DriveApp.getFolderById(CARPETA_PDF).getFilesByType(MimeType.PDF);
+  let nuevos = 0;
+  while (archivos.hasNext()) {
+    const archivo = archivos.next();
+    if (procesados.has(archivo.getId())) continue;
+    const p = parsearPlanilla_(textoDePdf_(archivo));
+    const subido = Utilities.formatDate(archivo.getDateCreated(), zona, 'yyyy-MM-dd');
+    if (!p.jugadores.length) {
+      est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `No se pudo leer "${archivo.getName()}": ¿es la planilla de la CAP con ${EQUIPO}?`]);
+      continue;
+    }
+    const fechaSesion = fechaPartido_(subido, fechasPartido, usadas);
+    const fecha = fechaSesion || subido;
+    usadas.add(fecha);
+    const notaFecha = fechaSesion ? '' : 'Revisá la fecha: no había un "Partido" en Sesiones esa semana; se usó el día en que se subió el PDF. ';
+
+    // jugadores del plantel y equivalencias
+    const plantel = hPlantel.getDataRange().getValues().slice(1).map((f) => nombre_(f[0])).filter(Boolean);
+    const equivalencias = {};
+    eqv.getDataRange().getValues().slice(1).forEach((f) => { if (nombre_(f[0]) && nombre_(f[1])) equivalencias[normalizar_(f[0])] = nombre_(f[1]); });
+
+    const rival = p.rival.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+    const filas = p.jugadores.map((j) => {
+      let jugador = emparejar_(j.nombre, plantel, equivalencias), nota = notaFecha;
+      if (!jugador) {
+        jugador = nombreNuevo_(j.nombre);
+        hPlantel.appendRow([jugador, 'Sí', 'Agregado desde una planilla de partido: revisá el nombre y las tildes']);
+        plantel.push(jugador);
+        nota += 'Jugador nuevo: se agregó al Plantel. ';
+      }
+      if (!equivalencias[normalizar_(j.nombre)]) { eqv.appendRow([j.nombre, jugador]); equivalencias[normalizar_(j.nombre)] = jugador; }
+      j.jugador = jugador;
+      return [fecha, rival, p.local ? 'Local' : 'Visitante', jugador, j.nombre, j.titular ? 'Sí' : '', j.minutos, j.puntos, j.t2c, j.t2i, j.t3c, j.t3i, j.tlc, j.tli,
+        j.rebDef, j.rebOf, j.rebTot, j.asistencias, j.recuperos, j.perdidas, j.tapas, j.tapasRecibidas, j.faltas, j.faltasRecibidas, j.valoracion, j.masMenos, archivo.getId(), nota.trim()];
+    });
+    est.getRange(est.getLastRow() + 1, 1, filas.length, filas[0].length).setValues(filas);
+
+    // minutos en Partidos: una columna por jugador, una fila por partido
+    const titulos = hPartidos.getRange(1, 1, 1, Math.max(hPartidos.getLastColumn(), 2)).getValues()[0].map(nombre_);
+    p.jugadores.forEach((j) => {
+      if (titulos.indexOf(j.jugador) < 0) { titulos.push(j.jugador); hPartidos.getRange(1, titulos.length).setValue(j.jugador).setFontWeight('bold'); }
+    });
+    const datos = hPartidos.getDataRange().getValues();
+    let fila = datos.findIndex((f, i) => i > 0 && fecha_(f[0], zona) === fecha && normalizar_(f[1]) === normalizar_(rival)) + 1;
+    if (fila <= 0) {
+      fila = hPartidos.getLastRow() + 1;
+      const [a, m, d] = fecha.split('-').map(Number);
+      hPartidos.getRange(fila, 1, 1, 2).setValues([[new Date(a, m - 1, d), rival]]);
+    }
+    p.jugadores.forEach((j) => hPartidos.getRange(fila, titulos.indexOf(j.jugador) + 1).setValue(j.minutos));
+    nuevos++;
+  }
+  Logger.log(nuevos ? `Se leyeron ${nuevos} planillas nuevas.` : 'No había planillas nuevas.');
+  if (nuevos) CacheService.getScriptCache().remove('evaluaciones');
+}
+
+/** Muestra en el registro lo que se lee del PDF más nuevo de la carpeta, sin escribir nada en la planilla. */
+function probarPlanilla() {
+  const archivos = DriveApp.getFolderById(CARPETA_PDF).getFilesByType(MimeType.PDF);
+  let ultimo = null;
+  while (archivos.hasNext()) { const a = archivos.next(); if (!ultimo || a.getDateCreated() > ultimo.getDateCreated()) ultimo = a; }
+  if (!ultimo) return Logger.log('La carpeta no tiene PDF.');
+  const p = parsearPlanilla_(textoDePdf_(ultimo));
+  const plantel = SpreadsheetApp.openById(ID_CARGA).getSheetByName('Plantel').getDataRange().getValues().slice(1).map((f) => nombre_(f[0])).filter(Boolean);
+  Logger.log(`${ultimo.getName()}: ${p.local ? 'local' : 'visitante'} contra ${p.rival}, ${p.jugadores.length} jugadores`);
+  p.jugadores.forEach((j) => Logger.log(`${j.nombre} → ${emparejar_(j.nombre, plantel, {}) || 'NUEVO: ' + nombreNuevo_(j.nombre)} · ${j.minutos} min · ${j.puntos} pts`));
+}
+
+/** Hace que procesarPlanillas se ejecute sola cada hora. Se ejecuta una sola vez. */
+function activarLecturaAutomatica() {
+  if (ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'procesarPlanillas')) return Logger.log('Ya estaba activada.');
+  ScriptApp.newTrigger('procesarPlanillas').timeBased().everyHours(1).create();
+  Logger.log('Listo: cada hora se leen los PDF nuevos de la carpeta.');
+}
+
 // ---------- Formulario de RPE ----------
 
 const OPCIONES_RPE = ['0 – Reposo', '1 – Muy, muy fácil', '2 – Fácil', '3 – Moderado', '4 – Algo duro', '5 – Duro', '6', '7 – Muy duro', '8', '9', '10 – Máximo'];
@@ -305,4 +490,4 @@ function probarLectura() {
   else Logger.log(`Carga: ${d.carga.sesiones.length} sesiones · ${d.carga.partidos.length} minutos de partido · ${d.carga.rpe.length} respuestas de RPE`);
 }
 
-if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_ };
+if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_ };
