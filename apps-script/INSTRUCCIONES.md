@@ -31,6 +31,19 @@ Elegí **probarLectura**, **Ejecutar** y mirá el registro de ejecución: dice c
 4. **Implementar** y copiá la **URL de la aplicación web**. Termina en `/exec`.
 5. Pasame esa URL y la conecto con la página (va en `js/config.js`).
 
+## Carga: minutos y RPE (planilla CARGA PRIMERA)
+La pestaña **Carga** de la página lee otra planilla, **CARGA PRIMERA** (misma carpeta). Para activarla, una sola vez:
+1. Pegá la versión nueva de `Codigo.gs` (paso 1) y guardá.
+2. Elegí la función **crearFormularioRPE** y **Ejecutar**. Google pide permisos de nuevo (ahora también para crear formularios y abrir la otra planilla): aceptalos.
+3. En el registro aparece el **link para los jugadores**. También queda en la página, en la pestaña Carga, con un botón para copiarlo.
+4. **Implementar > Administrar implementaciones > lápiz > Versión: Nueva versión > Implementar.**
+
+Después, en el día a día:
+- **Sesiones**: una fila por entrenamiento, gimnasio o partido, con la fecha, el tipo y cuántos minutos duró.
+- **Partidos**: una fila por partido con los minutos de cada jugador.
+- Los jugadores completan el formulario al terminar. Las respuestas caen solas en la pestaña "Respuestas RPE".
+- Si cambia el plantel, editá la pestaña **Plantel** de CARGA PRIMERA (y la columna en Partidos) y ejecutá **actualizarFormulario**.
+
 ## Cuando cargás una evaluación nueva
 No hay que hacer nada: cargala en Saltos, IFT o Encoder con el mismo formato y la página la muestra sola (tarda hasta 5 minutos, o tocá **Actualizar** en la página). Los cambios se calculan entre la primera y la última evaluación.
 

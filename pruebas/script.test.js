@@ -55,3 +55,30 @@ test('Encoder: los "A revisar" llegan sin velocidad', () => {
 test('si falta una columna avisa', () => {
   assert.throws(() => S.leerIft_([['Jugador', 'Fecha']]), /VIFT/);
 });
+
+test('Sesiones: fecha, tipo y duración', () => {
+  const filas = [['Fecha', 'Tipo', 'Duración (min)', 'Nota'], ['03/11/2026', 'Entrenamiento', 90, ''], ['04/11/2026', 'Gimnasio', '', 'sin cargar']];
+  assert.deepEqual(S.leerSesiones_(filas), [{ fecha: '2026-11-03', tipo: 'Entrenamiento', duracion: 90 }]);
+});
+
+test('Partidos: una columna por jugador, vacío = no jugó', () => {
+  const filas = [['Fecha', 'Rival', 'Ana', 'Beto'], ['08/11/2026', 'Colón', 32, ''], ['15/11/2026', 'Gimnasia', 0, 18]];
+  assert.deepEqual(S.leerPartidos_(filas), [
+    { fecha: '2026-11-08', rival: 'Colón', jugador: 'Ana', minutos: 32 },
+    { fecha: '2026-11-15', rival: 'Gimnasia', jugador: 'Ana', minutos: 0 },
+    { fecha: '2026-11-15', rival: 'Gimnasia', jugador: 'Beto', minutos: 18 },
+  ]);
+});
+
+test('RPE: toma el número de la opción y la fecha de la sesión si la completaron', () => {
+  assert.equal(S.rpe_('7 – Muy duro'), 7);
+  assert.equal(S.rpe_('10 – Máximo'), 10);
+  assert.equal(S.rpe_('Nada'), null);
+  const filas = [['Marca temporal', 'Jugador', 'Sesión', 'Esfuerzo (RPE)', 'Fecha de la sesión'],
+    [new Date('2026-11-03T22:00:00Z'), 'Ana', 'Entrenamiento', '6', ''],
+    [new Date('2026-11-04T12:00:00Z'), 'Beto', 'Partido', '8', '02/11/2026']];
+  const r = S.leerRpe_(filas);
+  assert.equal(r[0].fecha, '2026-11-03');
+  assert.equal(r[1].fecha, '2026-11-02');
+  assert.equal(r[1].rpe, 8);
+});

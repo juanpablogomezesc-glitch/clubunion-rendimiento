@@ -169,5 +169,31 @@
     }
   }
 
-  window.Graficos = { porJugador, asimetria, perfil, saltos, nf };
+  /** Barras por semana. filas: [{ semana: 'AAAA-MM-DD' (lunes), carga }] */
+  function semanas(box, filas, o) {
+    if (!filas.some((r) => r.carga)) return vacio(box, o.vacio || 'Sin carga registrada en estas semanas.');
+    const h = 220, m = { t: 22, r: 8, b: 30, l: 44 };
+    const c = lienzo(box, h);
+    if (!c) return;
+    const { svg, w } = c;
+    const x = d3.scaleBand(filas.map((r) => r.semana), [m.l, w - m.r]).padding(0.3);
+    const y = d3.scaleLinear([0, d3.max(filas, (r) => r.carga || 0) * 1.15], [h - m.b, m.t]);
+    for (const t of y.ticks(4)) {
+      svg.append('line').attr('x1', m.l).attr('x2', w - m.r).attr('y1', y(t)).attr('y2', y(t)).attr('stroke', 'var(--grid)');
+      svg.append('text').attr('x', m.l - 6).attr('y', y(t) + 4).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--texto-2)').text(nf(t, 0));
+    }
+    const fecha = (s) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+    const ultima = filas[filas.length - 1].semana;
+    filas.forEach((r) => {
+      svg.append('text').attr('x', x(r.semana) + x.bandwidth() / 2).attr('y', h - m.b + 17).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--texto-2)').text(fecha(r.semana));
+      if (!r.carga) return;
+      const bw = Math.min(40, x.bandwidth()), bx = x(r.semana) + (x.bandwidth() - bw) / 2;
+      conTip(svg.append('rect').datum(r).attr('x', bx).attr('width', bw).attr('y', y(r.carga)).attr('height', y(0) - y(r.carga)).attr('rx', 4)
+        .attr('fill', r.semana === ultima ? 'var(--rojo)' : '#6b7280'),
+        () => `Semana del ${fecha(r.semana)}`, () => `${nf(r.carga, 0)} UA${r.jugadores ? ` · ${r.jugadores} jugadores` : ''}`);
+      if (bw >= 26) svg.append('text').attr('x', bx + bw / 2).attr('y', y(r.carga) - 6).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--texto)').text(nf(r.carga, 0));
+    });
+  }
+
+  window.Graficos = { porJugador, asimetria, perfil, saltos, semanas, nf };
 })();

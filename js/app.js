@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const C = window.Calculos, G = window.Graficos, nf = G.nf;
+  const C = window.Calculos, G = window.Graficos, K = window.Carga, nf = G.nf;
   const $ = (s) => document.querySelector(s);
   const el = (tag, cls, texto) => { const e = document.createElement(tag); if (cls) e.className = cls; if (texto != null) e.textContent = texto; return e; };
   const signo = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '') + nf(Math.abs(v), d);
@@ -26,9 +26,10 @@
     ['Fuerza tren inferior', ['Sentadilla 80 kg', 'Sentadilla 100 kg']],
     ['Fuerza tren superior', ['Press plano 60 kg', 'Press plano 80 kg']],
   ];
-  const PESTANAS = ['resumen', 'resistencia', 'saltos', 'fuerza', 'jugador', 'leer'];
+  const PESTANAS = ['resumen', 'resistencia', 'saltos', 'fuerza', 'carga', 'jugador', 'leer'];
 
   let M = null; // modelo calculado
+  let CG = null; // carga calculada
   const estado = {
     pestana: 'resumen',
     jugador: null,
@@ -139,6 +140,72 @@
     G.porJugador($('#g-fuerza'), filas, opc(estado.fuerza));
   }
 
+  // ---------- Carga ----------
+  const fechaCorta = (f) => `${f.slice(8, 10)}/${f.slice(5, 7)}`;
+
+  function carga() {
+    $('#carga-error').hidden = !CG.error;
+    $('#carga-error').textContent = CG.error ? `No se pudo leer la planilla CARGA PRIMERA: ${CG.error}` : '';
+    $('#carga-vacio').hidden = !CG.vacio || !!CG.error;
+    $('#carga-form').hidden = !CG.formulario;
+    $('#link-form').value = CG.formulario || '';
+    for (const id of ['#tarjetas-carga', '#carga-equipo-tarjeta', '#carga-jugadores-tarjeta']) $(id).hidden = CG.vacio;
+    if (CG.vacio) return;
+
+    const tarjeta = (etiqueta, numero, unidad, detalle, cls) => {
+      const t = el('article', 'tarjeta dato'), n = el('p', 'numero' + (cls ? ' ' + cls : ''));
+      n.append(numero);
+      if (unidad) n.append(el('small', null, unidad));
+      t.append(el('p', 'etiqueta', etiqueta), n);
+      if (detalle) t.append(el('p', 'detalle', detalle));
+      return t;
+    };
+    const u = CG.ultimoPartido;
+    $('#tarjetas-carga').replaceChildren(
+      tarjeta('Carga del equipo · últimos 7 días', CG.carga7 != null ? nf(CG.carga7, 0) : '—', 'UA',
+        CG.cambio7 != null ? `${signo(CG.cambio7, 1)} % contra los 7 días anteriores · promedio por jugador` : 'Promedio por jugador'),
+      tarjeta('Sesiones · últimos 7 días', String(CG.sesiones7), null, 'Cargadas en la pestaña Sesiones'),
+      tarjeta('Formulario respondido', CG.cumplimiento != null ? String(CG.cumplimiento) : '—', CG.cumplimiento != null ? '%' : null,
+        'De las sesiones de los últimos 14 días', CG.cumplimiento != null && CG.cumplimiento < 70 ? 'aviso' : null),
+      tarjeta('Último partido', u ? u.rival || fechaCorta(u.fecha) : '—', null, u ? `${fechaCorta(u.fecha)} · jugaron ${u.jugaron}` : 'Todavía no hay partidos cargados'),
+    );
+    G.semanas($('#g-carga-equipo'), CG.equipoSemanal, {});
+
+    const conDatos = CG.jugadores.filter((j) => j.aguda != null || j.cronica != null || j.minutosTotal || j.ultimoPartido);
+    const orden = [...conDatos].sort((a, b) => (b.relacion || 0) - (a.relacion || 0) || (b.aguda || 0) - (a.aguda || 0));
+    $('#tabla-carga tbody').replaceChildren(...orden.map((j) => {
+      const tr = el('tr');
+      tr.dataset.jugador = j.jugador;
+      tr.tabIndex = 0;
+      const rel = el('td', 'num');
+      if (j.relacion != null) rel.append(el('span', 'pill ' + j.estado.tono, `${nf(j.relacion, 2)} · ${j.estado.nombre}`));
+      else rel.append(el('span', 'neutro', 'Faltan semanas'));
+      const ult = el('td', 'num');
+      if (j.ultimoPartido) ult.append(`${j.ultimoPartido.minutos} min`, el('span', 'sub', `${j.ultimoPartido.rival} · ${fechaCorta(j.ultimoPartido.fecha)}`));
+      else ult.append(el('span', 'neutro', '—'));
+      tr.append(el('td', null, j.jugador),
+        el('td', 'num' + (j.aguda == null ? ' neutro' : ''), j.aguda != null ? nf(j.aguda, 0) : '—'),
+        el('td', 'num' + (j.cronica == null ? ' neutro' : ''), j.cronica != null ? nf(j.cronica, 0) : '—'),
+        rel,
+        el('td', 'num' + (j.rpe7 == null ? ' neutro' : ''), j.rpe7 != null ? nf(j.rpe7, 1) : '—'),
+        el('td', 'num', j.minutosTotal ? `${j.minutosTotal}` : '—'),
+        ult);
+      return tr;
+    }));
+  }
+
+  function cargaJugador(j) {
+    const caja = $('#hoja-carga');
+    const d = CG && !CG.vacio ? CG.jugadores.find((x) => x.jugador === j) : null;
+    caja.hidden = !d || (!d.semanal.some((s) => s.carga) && !d.minutosTotal);
+    if (caja.hidden) return;
+    const partes = [];
+    if (d.aguda != null) partes.push(`Últimos 7 días: ${nf(d.aguda, 0)} UA${d.relacion != null ? ` (${nf(d.relacion, 2)} veces tu promedio semanal)` : ''}.`);
+    if (d.partidosJugados) partes.push(`Minutos en partidos: ${d.minutosTotal} en ${d.partidosJugados} ${d.partidosJugados === 1 ? 'partido' : 'partidos'} (promedio ${nf(d.minutosPromedio, 1)}).`);
+    $('#hoja-carga-nota').textContent = partes.join(' ') || 'RPE × minutos de cada semana, de lunes a domingo.';
+    G.semanas($('#g-carga-j'), d.semanal, { vacio: 'Todavía no respondiste el formulario en estas semanas.' });
+  }
+
   // ---------- Hoja del jugador ----------
   function jugador() {
     const sel = $('#sel-jugador');
@@ -207,13 +274,14 @@
       leyenda($(id).parentElement.querySelector('[data-leyenda]'), periodosDe(filas));
       G.perfil($(id), filas, { color, nombre });
     }
+    cargaJugador(j);
     const sj = M.mejores.filter((r) => r.jugador === j);
     leyenda($('#g-saltos-j').parentElement.querySelector('[data-leyenda]'), periodosDe(sj));
     G.saltos($('#g-saltos-j'), sj, { color, nombre });
   }
 
   // ---------- Navegación ----------
-  const DIBUJAR = { resumen, resistencia, saltos, fuerza, jugador, leer: () => {} };
+  const DIBUJAR = { resumen, resistencia, saltos, fuerza, carga, jugador, leer: () => {} };
   function dibujar() { if (M) DIBUJAR[estado.pestana](); }
 
   function mostrarPestana(p, desdeHash) {
@@ -234,6 +302,14 @@
 
   const abrirJugador = (tr) => { if (!tr) return; estado.jugador = tr.dataset.jugador; mostrarPestana('jugador'); window.scrollTo(0, 0); };
   $('#tabla-alertas tbody').addEventListener('click', (e) => abrirJugador(e.target.closest('tr[data-jugador]')));
+  $('#tabla-carga tbody').addEventListener('click', (e) => abrirJugador(e.target.closest('tr[data-jugador]')));
+  $('#tabla-carga tbody').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
+  $('#btn-copiar').addEventListener('click', () => {
+    const i = $('#link-form');
+    const listo = () => { $('#btn-copiar').textContent = 'Copiado'; setTimeout(() => { $('#btn-copiar').textContent = 'Copiar'; }, 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(i.value).then(listo, () => { i.select(); });
+    else i.select();
+  });
   $('#tabla-alertas tbody').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
 
   function presentar(si) {
@@ -265,6 +341,8 @@
 
   function iniciar(datos, cuando) {
     M = C.preparar(datos);
+    const hoy = demo && datos.carga ? K.ultimaFecha(datos.carga) : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    CG = K.preparar(datos.carga, hoy || new Date().toISOString().slice(0, 10));
     $('#cargando').hidden = true;
     $('#acceso').hidden = true;
     $('#app').hidden = false;

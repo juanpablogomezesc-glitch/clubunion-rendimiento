@@ -12,6 +12,7 @@
 const PAGINA = 'https://juanpablogomezesc-glitch.github.io/clubunion-rendimiento/'; // dónde está la página
 const SEGUNDOS_EN_MEMORIA = 300;            // una consulta repetida en 5 minutos no vuelve a leer la planilla
 const SEGUNDOS_MINIMOS_ENTRE_LECTURAS = 30; // el botón "Actualizar" no lee la planilla más de una vez cada 30 segundos
+const ID_CARGA = '1I0zUBZIcicYVUmd854eoCoBwNfNuO-43VO1zoi0cPyQ'; // planilla "CARGA PRIMERA" (sesiones, partidos y RPE)
 // ======================
 
 const HOJA_ACCESOS = 'Accesos';
@@ -97,6 +98,60 @@ function leerEncoder_(filas, zona) {
   return out;
 }
 
+/** Pestaña Sesiones → [{ fecha, tipo, duracion }] (una fila por sesión del equipo). */
+function leerSesiones_(filas, zona) {
+  const t = filas[0] || [];
+  const c = { f: columna_(t, ['Fecha']), t: columna_(t, ['Tipo']), d: columna_(t, ['Duracion', 'Duración']) };
+  if (c.f < 0 || c.t < 0 || c.d < 0) throw new Error('La pestaña Sesiones no tiene las columnas Fecha, Tipo y Duración.');
+  const out = [];
+  for (const f of filas.slice(1)) {
+    const fecha = fecha_(f[c.f], zona), duracion = numero_(f[c.d]);
+    if (!fecha || duracion == null || duracion <= 0) continue;
+    out.push({ fecha, tipo: nombre_(f[c.t]) || 'Entrenamiento', duracion });
+  }
+  return out;
+}
+
+/** Pestaña Partidos (una columna por jugador) → [{ fecha, rival, jugador, minutos }]. Vacío = no jugó. */
+function leerPartidos_(filas, zona) {
+  const t = filas[0] || [];
+  const cf = columna_(t, ['Fecha']), cr = columna_(t, ['Rival']);
+  if (cf < 0) throw new Error('La pestaña Partidos no tiene la columna Fecha.');
+  const jugadores = t.map((n, i) => (i === cf || i === cr || !nombre_(n) ? null : nombre_(n)));
+  const out = [];
+  for (const f of filas.slice(1)) {
+    const fecha = fecha_(f[cf], zona);
+    if (!fecha) continue;
+    jugadores.forEach((jugador, i) => {
+      const minutos = jugador ? numero_(f[i]) : null;
+      if (jugador && minutos != null) out.push({ fecha, rival: cr >= 0 ? nombre_(f[cr]) : '', jugador, minutos });
+    });
+  }
+  return out;
+}
+
+/** "7 – Muy duro" / 7 → 7 */
+function rpe_(v) {
+  if (typeof v === 'number') return v >= 0 && v <= 10 ? v : null;
+  const m = /^\s*(\d{1,2})/.exec(String(v == null ? '' : v));
+  return m && +m[1] <= 10 ? +m[1] : null;
+}
+
+/** Respuestas del formulario → [{ fecha, jugador, tipo, rpe }]. Usa "Fecha de la sesión" si la completaron, si no el día de la respuesta. */
+function leerRpe_(filas, zona) {
+  const t = filas[0] || [];
+  const c = { m: columna_(t, ['Marca temporal', 'Timestamp']), j: columna_(t, ['Jugador']), t: columna_(t, ['Sesion', 'Sesión']), r: columna_(t, ['Esfuerzo', 'RPE']), f: columna_(t, ['Fecha de la sesion', 'Fecha de la sesión']) };
+  if (c.j < 0 || c.r < 0) throw new Error('Las respuestas del formulario no tienen las preguntas Jugador y Esfuerzo.');
+  const out = [];
+  for (const f of filas.slice(1)) {
+    const jugador = nombre_(f[c.j]), rpe = rpe_(f[c.r]);
+    const fecha = (c.f >= 0 && fecha_(f[c.f], zona)) || (c.m >= 0 && fecha_(f[c.m], zona));
+    if (!jugador || rpe == null || !fecha) continue;
+    out.push({ fecha, jugador, tipo: c.t >= 0 ? nombre_(f[c.t]) || 'Entrenamiento' : 'Entrenamiento', rpe });
+  }
+  return out;
+}
+
 // ---------- Planilla ----------
 
 function leerTodo_() {
@@ -111,7 +166,27 @@ function leerTodo_() {
     saltos: leerSaltos_(hoja('Saltos'), zona),
     ift: leerIft_(hoja('IFT'), zona),
     encoder: leerEncoder_(hoja('Encoder'), zona),
+    carga: leerCarga_(),
   };
+}
+
+/** Lee la planilla CARGA PRIMERA. Si falla, la página igual muestra las evaluaciones. */
+function leerCarga_() {
+  try {
+    const ss = SpreadsheetApp.openById(ID_CARGA);
+    const zona = ss.getSpreadsheetTimeZone();
+    const valores = (h) => (h ? h.getDataRange().getValues() : [[]]);
+    const respuestas = ss.getSheets().find((h) => /^respuestas/i.test(h.getName()));
+    return {
+      sesiones: leerSesiones_(valores(ss.getSheetByName('Sesiones')), zona),
+      partidos: leerPartidos_(valores(ss.getSheetByName('Partidos')), zona),
+      rpe: respuestas ? leerRpe_(valores(respuestas), zona) : [],
+      plantel: valores(ss.getSheetByName('Plantel')).slice(1).filter((f) => nombre_(f[0]) && normalizar_(f[1]) !== 'no').map((f) => nombre_(f[0])),
+      formulario: PropertiesService.getScriptProperties().getProperty('FORM_URL') || '',
+    };
+  } catch (err) {
+    return { error: String(err && err.message || err) };
+  }
 }
 
 function clavesValidas_() {
@@ -178,11 +253,56 @@ function generarClaves() {
   }
 }
 
+// ---------- Formulario de RPE ----------
+
+const OPCIONES_RPE = ['0 – Reposo', '1 – Muy, muy fácil', '2 – Fácil', '3 – Moderado', '4 – Algo duro', '5 – Duro', '6', '7 – Muy duro', '8', '9', '10 – Máximo'];
+
+/** Crea el formulario que completan los jugadores y lo conecta con la planilla CARGA PRIMERA. Se ejecuta una sola vez. */
+function crearFormularioRPE() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('FORM_ID')) {
+    Logger.log('El formulario ya existe: ' + props.getProperty('FORM_URL'));
+    return;
+  }
+  const form = FormApp.create('¿Cuánto te costó? · Primera Unión');
+  form.setDescription('Completalo apenas termina el entrenamiento o el partido. Tarda 10 segundos.')
+    .setCollectEmail(false).setLimitOneResponsePerUser(false).setProgressBar(false)
+    .setConfirmationMessage('¡Gracias! Quedó registrado.');
+  form.addListItem().setTitle('Jugador').setRequired(true);
+  form.addMultipleChoiceItem().setTitle('Sesión').setChoiceValues(['Entrenamiento', 'Gimnasio', 'Partido', 'Otro']).setRequired(true);
+  form.addMultipleChoiceItem().setTitle('Esfuerzo (RPE)')
+    .setHelpText('¿Qué tan dura fue la sesión en general? 0 es nada, 10 es lo máximo que podrías hacer.')
+    .setChoiceValues(OPCIONES_RPE).setRequired(true);
+  form.addDateItem().setTitle('Fecha de la sesión').setHelpText('Solo si no es de hoy.').setRequired(false);
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, ID_CARGA);
+  props.setProperty('FORM_ID', form.getId());
+  props.setProperty('FORM_URL', form.getPublishedUrl());
+  actualizarFormulario();
+  SpreadsheetApp.flush();
+  const hoja = SpreadsheetApp.openById(ID_CARGA).getSheets().find((h) => /^respuestas de formulario/i.test(h.getName()));
+  if (hoja) hoja.setName('Respuestas RPE');
+  Logger.log('Listo. Link para los jugadores: ' + form.getPublishedUrl());
+}
+
+/** Pone en la lista del formulario los jugadores activos de la pestaña Plantel. Ejecutalo cuando cambie el plantel. */
+function actualizarFormulario() {
+  const id = PropertiesService.getScriptProperties().getProperty('FORM_ID');
+  if (!id) throw new Error('Primero ejecutá crearFormularioRPE.');
+  const plantel = SpreadsheetApp.openById(ID_CARGA).getSheetByName('Plantel').getDataRange().getValues().slice(1)
+    .filter((f) => nombre_(f[0]) && normalizar_(f[1]) !== 'no').map((f) => nombre_(f[0]));
+  const form = FormApp.openById(id);
+  const item = form.getItems(FormApp.ItemType.LIST)[0].asListItem();
+  item.setChoiceValues(plantel);
+  Logger.log(`Formulario con ${plantel.length} jugadores.`);
+}
+
 /** Muestra en el registro cuántas filas lee de cada pestaña. */
 function probarLectura() {
   const d = leerTodo_();
   Logger.log(`Saltos: ${d.saltos.length} intentos · IFT: ${d.ift.length} tests · Encoder: ${d.encoder.length} cargas`);
   Logger.log(`Jugadores: ${[...new Set([...d.saltos, ...d.ift, ...d.encoder].map((r) => r.jugador))].join(', ')}`);
+  if (d.carga.error) Logger.log('Carga: ' + d.carga.error);
+  else Logger.log(`Carga: ${d.carga.sesiones.length} sesiones · ${d.carga.partidos.length} minutos de partido · ${d.carga.rpe.length} respuestas de RPE`);
 }
 
-if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_ };
+if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_ };

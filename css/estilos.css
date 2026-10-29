@@ -11,6 +11,7 @@
   --rojo: #e0262d;
   --rojo-suave: rgba(224, 38, 45, 0.14);
   --ok: #4ade80;
+  --aviso: #fbbf24;
   --mal: #ff5a5f;
   --grid: #26262b;
   --eje: #3f3f46;
@@ -118,6 +119,8 @@ button, input, select { font: inherit; color: inherit; }
 .ok { color: var(--ok) !important; }
 .mal { color: var(--mal) !important; }
 .neutro { color: var(--texto-2) !important; }
+.aviso { color: var(--aviso) !important; }
+.pill { display: inline-block; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; font-size: 13px; white-space: nowrap; }
 
 /* Controles */
 .control { display: flex; align-items: center; gap: 8px; }

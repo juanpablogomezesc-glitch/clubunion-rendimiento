@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=3">
+  <link rel="stylesheet" href="css/estilos.css?v=4">
 </head>
 <body>
   <div class="franjas" aria-hidden="true"></div>
@@ -66,6 +66,7 @@
         <button class="pestana" role="tab" data-tab="resistencia" aria-selected="false">Resistencia</button>
         <button class="pestana" role="tab" data-tab="saltos" aria-selected="false">Saltos</button>
         <button class="pestana" role="tab" data-tab="fuerza" aria-selected="false">Fuerza</button>
+        <button class="pestana" role="tab" data-tab="carga" aria-selected="false">Carga</button>
         <button class="pestana" role="tab" data-tab="jugador" aria-selected="false">Jugador</button>
         <button class="pestana" role="tab" data-tab="leer" aria-selected="false">Cómo leerlo</button>
       </div>
@@ -199,6 +200,52 @@
         </article>
       </section>
 
+      <!-- CARGA -->
+      <section class="panel" id="carga" role="tabpanel" hidden>
+        <p class="nota nota-error" id="carga-error" hidden></p>
+        <article class="tarjeta" id="carga-vacio" hidden>
+          <h2 class="subtitulo">Todavía no hay datos de carga</h2>
+          <p>Esta sección se arma sola a medida que cargás las sesiones y los partidos en la planilla CARGA PRIMERA y los jugadores completan el formulario después de cada sesión. Con una semana ya se ve la carga semanal; con cinco, la relación aguda:crónica de cada jugador.</p>
+        </article>
+        <div class="mosaico" id="tarjetas-carga"></div>
+
+        <article class="tarjeta" id="carga-equipo-tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Carga semanal del equipo</h2>
+              <p class="nota">Promedio por jugador de RPE × minutos (UA), de lunes a domingo. Últimas 8 semanas; la barra roja es la semana en curso.</p>
+            </div>
+          </header>
+          <div class="grafico" id="g-carga-equipo"></div>
+        </article>
+
+        <article class="tarjeta" id="carga-jugadores-tarjeta">
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Por jugador</h2>
+              <p class="nota">Últimos 7 días contra el promedio semanal de las 4 semanas anteriores. Entre 0,8 y 1,3 es la zona habitual; más de 1,5 es un salto grande de carga (referencia orientativa, no un umbral validado). Tocá un jugador para ver su hoja.</p>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla tabla-clic" id="tabla-carga">
+              <thead><tr>
+                <th>Jugador</th><th class="num">Últimos 7 días</th><th class="num">Promedio semanal</th><th class="num">Aguda:crónica</th><th class="num">RPE medio</th><th class="num">Minutos jugados</th><th class="num">Último partido</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="tarjeta" id="carga-form" hidden>
+          <h2 class="subtitulo">Formulario para los jugadores</h2>
+          <p class="nota">Pasales este link (por ejemplo, fijado en el grupo de WhatsApp). Lo completan al terminar cada entrenamiento o partido: elegir su nombre, el tipo de sesión y cuánto les costó de 0 a 10.</p>
+          <div class="acceso-form">
+            <input id="link-form" type="text" readonly>
+            <button type="button" class="boton" id="btn-copiar">Copiar</button>
+          </div>
+        </article>
+      </section>
+
       <!-- JUGADOR -->
       <section class="panel" id="jugador" role="tabpanel" hidden>
         <div class="barra-jugador">
@@ -225,6 +272,12 @@
             <h3 class="subtitulo">Tus distancias de entrenamiento</h3>
             <p class="nota" id="hoja-int-nota"></p>
             <div class="mosaico mosaico-4" id="hoja-intervalos"></div>
+          </article>
+
+          <article class="tarjeta" id="hoja-carga" hidden>
+            <h3 class="subtitulo">Tu carga semanal</h3>
+            <p class="nota" id="hoja-carga-nota"></p>
+            <div class="grafico" id="g-carga-j"></div>
           </article>
 
           <article class="tarjeta">
@@ -282,9 +335,10 @@
   <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <script src="js/vendor/d3-7.9.0.min.js"></script>
-  <script src="js/config.js?v=3"></script>
-  <script src="js/calculos.js?v=3"></script>
-  <script src="js/graficos.js?v=3"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/config.js?v=4"></script>
+  <script src="js/calculos.js?v=4"></script>
+  <script src="js/carga.js?v=4"></script>
+  <script src="js/graficos.js?v=4"></script>
+  <script src="js/app.js?v=4"></script>
 </body>
 </html>

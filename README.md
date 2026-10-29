@@ -1,7 +1,7 @@
 # Rendimiento · Club Unión de Santo Tomé
 
 Página del área de rendimiento de la Primera de básquet: evaluaciones físicas (saltos, test 30-15, encoder),
-distancias para los intermitentes y una hoja por jugador para mostrarle sus resultados.
+distancias para los intermitentes, carga semanal (RPE × minutos) y minutos jugados, y una hoja por jugador para mostrarle sus resultados.
 
 Los datos **no están en este repositorio**: viven en las planillas de Google y la página los pide con una clave
 a un script de Google (ver `apps-script/INSTRUCCIONES.md`). Para ver la página con datos inventados: agregá `?demo` al link.
@@ -14,9 +14,10 @@ a un script de Google (ver `apps-script/INSTRUCCIONES.md`). Para ver la página 
 | `css/estilos.css` | Diseño (colores del club) |
 | `js/config.js` | La URL del script de Google |
 | `js/calculos.js` | Todos los cálculos, sin tocar la página (se prueban con Node) |
+| `js/carga.js` | Cálculos de carga: RPE × minutos, carga semanal, relación aguda:crónica, minutos jugados |
 | `js/graficos.js` | Los gráficos (d3) |
 | `js/app.js` | Carga de datos, clave, pestañas y la hoja del jugador |
-| `apps-script/Codigo.gs` | El script que lee la planilla DATOS PRIMERA - LIMPIO |
+| `apps-script/Codigo.gs` | El script que lee DATOS PRIMERA - LIMPIO y CARGA PRIMERA, y crea el formulario de RPE |
 | `datos/ejemplo.json` | Datos inventados para `?demo` |
 
 ## Sumar una sección nueva (wellness, minutos, carga)
