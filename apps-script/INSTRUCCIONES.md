@@ -39,7 +39,7 @@ La pestaña **Carga** de la página lee otra planilla, **CARGA PRIMERA** (misma 
 4. **Implementar > Administrar implementaciones > lápiz > Versión: Nueva versión > Implementar.**
 
 Después, en el día a día:
-- **Sesiones**: una fila por entrenamiento, gimnasio o partido, con la fecha, el tipo y cuántos minutos duró.
+- **Sesiones** se completa sola: cada hora el script agrega una fila por cada día y tipo de sesión que tenga respuestas del formulario, con la duración habitual de la pestaña **Ajustes** (Entrenamiento 90, Gimnasio 60, Partido 120, Otro 60; cambialas ahí). Si una sesión duró distinto, corregí la duración en su fila.
 - **Partidos**: una fila por partido con los minutos de cada jugador.
 - Los jugadores completan el formulario al terminar. Las respuestas caen solas en la pestaña "Respuestas RPE".
 - Si cambia el plantel, editá la pestaña **Plantel** de CARGA PRIMERA (y la columna en Partidos) y ejecutá **actualizarFormulario**.
@@ -54,7 +54,7 @@ Una sola vez:
 4. **Implementar > Administrar implementaciones > lápiz > Versión: Nueva versión > Implementar.**
 
 Después de cada partido:
-- Cargá la fila "Partido" en **Sesiones** (fecha y duración), como siempre: de ahí sale la **fecha**, porque el PDF no la trae.
+- La **fecha** del partido sale de la fila "Partido" de Sesiones, que se crea sola cuando los jugadores responden el formulario eligiendo "Partido" (el PDF no trae la fecha).
 - Subí el PDF a la carpeta **Planillas de partido (PDF)** (desde el celular con la app de Drive).
 - En menos de una hora aparecen los minutos en **Partidos** y todas las métricas en la pestaña **Estadísticas**.
 

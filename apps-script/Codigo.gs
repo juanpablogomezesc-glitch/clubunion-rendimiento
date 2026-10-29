@@ -221,6 +221,21 @@ function nombreNuevo_(nombreCap) {
   return [titulo((nom || '').trim().split(/\s+/)[0] || ''), titulo(ap || '')].filter(Boolean).join(' ');
 }
 
+/**
+ * Sesiones que faltan en la pestaña Sesiones: un día y tipo con respuestas del formulario y sin fila propia.
+ * existentes: claves "AAAA-MM-DD|Tipo" de las filas que ya están (aunque no tengan duración).
+ */
+function sesionesFaltantes_(existentes, rpe, duraciones) {
+  const ya = new Set(existentes), out = [];
+  for (const r of rpe) {
+    const k = r.fecha + '|' + r.tipo;
+    if (ya.has(k)) continue;
+    ya.add(k);
+    out.push({ fecha: r.fecha, tipo: r.tipo, duracion: duraciones[r.tipo] || duraciones.Otro || 60 });
+  }
+  return out.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+}
+
 /** La planilla no trae la fecha: es la del último "Partido" de Sesiones en la semana antes de subir el PDF. */
 function fechaPartido_(subido, fechasPartido, usadas) {
   const d = new Date(subido + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 6);
@@ -355,12 +370,52 @@ function textoDePdf_(archivo) {
   }
 }
 
+const DURACIONES_HABITUALES = [['Entrenamiento', 90], ['Gimnasio', 60], ['Partido', 120], ['Otro', 60]];
+
 /**
- * Lee los PDF nuevos de la carpeta "Planillas de partido (PDF)" y completa las pestañas Estadísticas y Partidos
- * de CARGA PRIMERA. Un PDF ya leído no se vuelve a leer. Se ejecuta solo cada hora (ver activarLecturaAutomatica).
+ * Agrega a Sesiones los días que tienen respuestas del formulario y no tienen fila, con la duración habitual
+ * de la pestaña "Ajustes". Una fila que ya está pero no tiene duración se completa con la habitual.
+ */
+function completarSesiones_(ss, zona) {
+  const ajustes = hojaConTitulos_(ss, 'Ajustes', ['Tipo de sesión', 'Duración habitual (min)']);
+  if (ajustes.getLastRow() < 2) ajustes.getRange(2, 1, DURACIONES_HABITUALES.length, 2).setValues(DURACIONES_HABITUALES);
+  const duraciones = {};
+  ajustes.getDataRange().getValues().slice(1).forEach((f) => { const d = numero_(f[1]); if (nombre_(f[0]) && d > 0) duraciones[nombre_(f[0])] = d; });
+
+  const respuestas = ss.getSheets().find((h) => /^respuestas/i.test(h.getName()));
+  if (!respuestas) return 0;
+  const rpe = leerRpe_(respuestas.getDataRange().getValues(), zona);
+  const hSes = ss.getSheetByName('Sesiones');
+  const filas = hSes.getDataRange().getValues();
+  const existentes = [];
+  filas.forEach((f, i) => {
+    const fecha = i > 0 && fecha_(f[0], zona), tipo = nombre_(f[1]);
+    if (!fecha || !tipo) return;
+    existentes.push(fecha + '|' + tipo);
+    if (!(numero_(f[2]) > 0) && duraciones[tipo]) {
+      hSes.getRange(i + 1, 3, 1, 2).setValues([[duraciones[tipo], 'Duración habitual: corregila si fue distinta']]);
+    }
+  });
+  const nuevas = sesionesFaltantes_(existentes, rpe, duraciones);
+  if (nuevas.length) {
+    hSes.getRange(hSes.getLastRow() + 1, 1, nuevas.length, 4).setValues(nuevas.map((x) => {
+      const [a, m, d] = x.fecha.split('-').map(Number);
+      return [new Date(a, m - 1, d), x.tipo, x.duracion, 'Agregada sola por las respuestas del formulario: corregí la duración si fue distinta'];
+    }));
+  }
+  return nuevas.length;
+}
+
+/**
+ * Se ejecuta sola cada hora (ver activarLecturaAutomatica):
+ * 1. agrega a Sesiones los días que tienen respuestas del formulario de RPE;
+ * 2. lee los PDF nuevos de la carpeta "Planillas de partido (PDF)" y completa Estadísticas y Partidos.
+ * Un PDF ya leído no se vuelve a leer.
  */
 function procesarPlanillas() {
   const ss = SpreadsheetApp.openById(ID_CARGA), zona = ss.getSpreadsheetTimeZone();
+  const sesionesNuevas = completarSesiones_(ss, zona);
+  if (sesionesNuevas) Logger.log(`Se agregaron ${sesionesNuevas} sesiones a partir del formulario.`);
   const est = hojaConTitulos_(ss, 'Estadísticas', TITULOS_ESTADISTICAS);
   const eqv = hojaConTitulos_(ss, 'Equivalencias', ['Nombre en la planilla CAP', 'Jugador']);
   const hPlantel = ss.getSheetByName('Plantel'), hPartidos = ss.getSheetByName('Partidos');
@@ -423,7 +478,7 @@ function procesarPlanillas() {
     nuevos++;
   }
   Logger.log(nuevos ? `Se leyeron ${nuevos} planillas nuevas.` : 'No había planillas nuevas.');
-  if (nuevos) CacheService.getScriptCache().remove('evaluaciones');
+  if (nuevos || sesionesNuevas) CacheService.getScriptCache().remove('evaluaciones');
 }
 
 /** Muestra en el registro lo que se lee del PDF más nuevo de la carpeta, sin escribir nada en la planilla. */
@@ -497,4 +552,4 @@ function probarLectura() {
   else Logger.log(`Carga: ${d.carga.sesiones.length} sesiones · ${d.carga.partidos.length} minutos de partido · ${d.carga.rpe.length} respuestas de RPE`);
 }
 
-if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_ };
+if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_, sesionesFaltantes_ };

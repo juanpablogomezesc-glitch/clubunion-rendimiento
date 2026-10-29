@@ -156,3 +156,19 @@ test('planilla de la CAP: negativos con guion invisible (U+00AD) y título con s
   assert.equal(p.jugadores[1].valoracion, -1);
   assert.equal(p.jugadores[1].masMenos, -15);
 });
+
+test('sesiones que faltan: una por día y tipo con respuestas, con la duración habitual', () => {
+  const rpe = [
+    { fecha: '2026-10-29', jugador: 'Ana', tipo: 'Entrenamiento', rpe: 5 },
+    { fecha: '2026-10-29', jugador: 'Beto', tipo: 'Entrenamiento', rpe: 4 },
+    { fecha: '2026-10-29', jugador: 'Ana', tipo: 'Gimnasio', rpe: 6 },
+    { fecha: '2026-10-26', jugador: 'Ana', tipo: 'Partido', rpe: 8 },
+    { fecha: '2026-10-30', jugador: 'Ana', tipo: 'Otro', rpe: 3 },
+  ];
+  const nuevas = S.sesionesFaltantes_(['2026-10-26|Partido'], rpe, { Entrenamiento: 90, Gimnasio: 60, Partido: 120, Otro: 45 });
+  assert.deepEqual(nuevas, [
+    { fecha: '2026-10-29', tipo: 'Entrenamiento', duracion: 90 },
+    { fecha: '2026-10-29', tipo: 'Gimnasio', duracion: 60 },
+    { fecha: '2026-10-30', tipo: 'Otro', duracion: 45 },
+  ]);
+});
