@@ -103,13 +103,14 @@ function leerEncoder_(filas, zona) {
 /** Pestaña Sesiones → [{ fecha, tipo, duracion }] (una fila por sesión del equipo). */
 function leerSesiones_(filas, zona) {
   const t = filas[0] || [];
-  const c = { f: columna_(t, ['Fecha']), t: columna_(t, ['Tipo']), d: columna_(t, ['Duracion', 'Duración']) };
+  const c = { f: columna_(t, ['Fecha']), t: columna_(t, ['Tipo']), d: columna_(t, ['Duracion', 'Duración']), n: columna_(t, ['Nota']) };
   if (c.f < 0 || c.t < 0 || c.d < 0) throw new Error('La pestaña Sesiones no tiene las columnas Fecha, Tipo y Duración.');
   const out = [];
   for (const f of filas.slice(1)) {
     const fecha = fecha_(f[c.f], zona), duracion = numero_(f[c.d]);
     if (!fecha || duracion == null || duracion <= 0) continue;
-    out.push({ fecha, tipo: nombre_(f[c.t]) || 'Entrenamiento', duracion });
+    const nota = c.n >= 0 ? nombre_(f[c.n]) : '';
+    out.push({ fecha, tipo: nombre_(f[c.t]) || 'Entrenamiento', duracion, automatica: /agregada sola|duraci[oó]n habitual/i.test(nota) });
   }
   return out;
 }
@@ -275,6 +276,7 @@ function leerCarga_() {
       rpe: respuestas ? leerRpe_(valores(respuestas), zona) : [],
       plantel: valores(ss.getSheetByName('Plantel')).slice(1).filter((f) => nombre_(f[0]) && normalizar_(f[1]) !== 'no').map((f) => nombre_(f[0])),
       formulario: PropertiesService.getScriptProperties().getProperty('FORM_URL') || '',
+      novedades: novedades_(ss, zona),
     };
   } catch (err) {
     return { error: String(err && err.message || err) };
@@ -285,6 +287,28 @@ function clavesValidas_() {
   const h = SpreadsheetApp.getActive().getSheetByName(HOJA_ACCESOS);
   if (!h) return [];
   return h.getDataRange().getValues().slice(1).map((f) => String(f[1] || '').trim()).filter((c) => c.length >= 16);
+}
+
+/** Lo que el script hizo solo y conviene mirar: jugadores nuevos y planillas con la fecha dudosa o que no se pudieron leer. */
+function novedades_(ss, zona) {
+  const out = [];
+  const plantel = ss.getSheetByName('Plantel');
+  if (plantel) plantel.getDataRange().getValues().slice(1).forEach((f) => {
+    if (/agregado desde una planilla/i.test(String(f[2]))) out.push({ fecha: '', texto: `${nombre_(f[0])} se agregó al plantel desde una planilla de la CAP. Si el nombre necesita tildes, corregilo en la pestaña Plantel.` });
+  });
+  const est = ss.getSheetByName('Estadísticas');
+  if (est) {
+    const vistos = new Set();
+    est.getDataRange().getValues().slice(1).forEach((f) => {
+      const nota = nombre_(f[TITULOS_ESTADISTICAS.indexOf('Nota')]);
+      const fecha = fecha_(f[0], zona) || '';
+      if (/revis[aá] la fecha|no se pudo leer/i.test(nota) && !vistos.has(fecha + nota)) {
+        vistos.add(fecha + nota);
+        out.push({ fecha, texto: nota.replace(/Jugador nuevo: se agregó al Plantel\.\s*/i, '').trim() + (f[1] ? ` (${nombre_(f[1])})` : '') });
+      }
+    });
+  }
+  return out;
 }
 
 // ---------- Web ----------
@@ -307,6 +331,46 @@ function doGet(e) {
     if (texto.length < 100000) cache.put('evaluaciones', texto, SEGUNDOS_EN_MEMORIA);
     cache.put('lectura-reciente', '1', SEGUNDOS_MINIMOS_ENTRE_LECTURAS);
     return ContentService.createTextOutput(texto).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return responder_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Escrituras desde la página (con clave): subir el PDF de un partido y corregir la duración de una sesión.
+ * La página manda JSON como texto plano para no disparar la verificación previa del navegador.
+ */
+function doPost(e) {
+  try {
+    const p = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (!p.clave || clavesValidas_().indexOf(String(p.clave).trim()) < 0) return responder_({ ok: false, error: 'clave' });
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      if (p.accion === 'subirPdf') {
+        const bytes = Utilities.base64Decode(String(p.datos || ''));
+        if (!bytes.length || bytes.length > 10 * 1024 * 1024) return responder_({ ok: false, error: 'El archivo está vacío o es demasiado grande.' });
+        const nombre = String(p.nombre || 'planilla.pdf').replace(/[^\w .()-]/g, '_').slice(0, 120);
+        const carpeta = DriveApp.getFolderById(CARPETA_PDF);
+        if (carpeta.getFilesByName(nombre).hasNext()) return responder_({ ok: false, error: 'Esa planilla ya estaba cargada.' });
+        carpeta.createFile(Utilities.newBlob(bytes, MimeType.PDF, nombre));
+        return responder_({ ok: true, resultado: procesarPlanillas() });
+      }
+      if (p.accion === 'duracion') {
+        const duracion = Number(p.duracion);
+        if (!(duracion > 0 && duracion <= 300)) return responder_({ ok: false, error: 'La duración tiene que estar entre 1 y 300 minutos.' });
+        const ss = SpreadsheetApp.openById(ID_CARGA), zona = ss.getSpreadsheetTimeZone(), h = ss.getSheetByName('Sesiones');
+        const filas = h.getDataRange().getValues();
+        const i = filas.findIndex((f, k) => k > 0 && fecha_(f[0], zona) === p.fecha && nombre_(f[1]) === p.tipo);
+        if (i < 0) return responder_({ ok: false, error: 'No se encontró esa sesión.' });
+        h.getRange(i + 1, 3, 1, 2).setValues([[duracion, 'Corregida desde la página']]);
+        return responder_({ ok: true });
+      }
+      return responder_({ ok: false, error: 'accion' });
+    } finally {
+      lock.releaseLock();
+      CacheService.getScriptCache().remove('evaluaciones');
+    }
   } catch (err) {
     return responder_({ ok: false, error: String(err && err.message || err) });
   }
@@ -426,7 +490,7 @@ function procesarPlanillas() {
   const fechasPartido = leerSesiones_(ss.getSheetByName('Sesiones').getDataRange().getValues(), zona).filter((x) => x.tipo === 'Partido').map((x) => x.fecha);
 
   const archivos = DriveApp.getFolderById(CARPETA_PDF).getFilesByType(MimeType.PDF);
-  let nuevos = 0;
+  const resumen = [];
   while (archivos.hasNext()) {
     const archivo = archivos.next();
     if (procesados.has(archivo.getId())) continue;
@@ -434,6 +498,7 @@ function procesarPlanillas() {
     const subido = Utilities.formatDate(archivo.getDateCreated(), zona, 'yyyy-MM-dd');
     if (!p.jugadores.length) {
       est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `No se pudo leer "${archivo.getName()}": ¿es la planilla de la CAP con ${EQUIPO}?`]);
+      resumen.push({ archivo: archivo.getName(), error: `No se pudo leer: ¿es la planilla de estadísticas de la CAP de un partido de ${EQUIPO}?` });
       continue;
     }
     const fechaSesion = fechaPartido_(subido, fechasPartido, usadas);
@@ -447,6 +512,7 @@ function procesarPlanillas() {
     eqv.getDataRange().getValues().slice(1).forEach((f) => { if (nombre_(f[0]) && nombre_(f[1])) equivalencias[normalizar_(f[0])] = nombre_(f[1]); });
 
     const rival = p.rival.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+    const jugadoresNuevos = [];
     const filas = p.jugadores.map((j) => {
       let jugador = emparejar_(j.nombre, plantel, equivalencias), nota = notaFecha;
       if (!jugador) {
@@ -454,6 +520,7 @@ function procesarPlanillas() {
         hPlantel.appendRow([jugador, 'Sí', 'Agregado desde una planilla de partido: revisá el nombre y las tildes']);
         plantel.push(jugador);
         nota += 'Jugador nuevo: se agregó al Plantel. ';
+        jugadoresNuevos.push(jugador);
       }
       if (!equivalencias[normalizar_(j.nombre)]) { eqv.appendRow([j.nombre, jugador]); equivalencias[normalizar_(j.nombre)] = jugador; }
       j.jugador = jugador;
@@ -475,10 +542,11 @@ function procesarPlanillas() {
       hPartidos.getRange(fila, 1, 1, 2).setValues([[new Date(a, m - 1, d), rival]]);
     }
     p.jugadores.forEach((j) => hPartidos.getRange(fila, titulos.indexOf(j.jugador) + 1).setValue(j.minutos));
-    nuevos++;
+    resumen.push({ archivo: archivo.getName(), fecha, fechaDudosa: !fechaSesion, rival, local: p.local, jugadores: p.jugadores.length, nuevos: jugadoresNuevos });
   }
-  Logger.log(nuevos ? `Se leyeron ${nuevos} planillas nuevas.` : 'No había planillas nuevas.');
-  if (nuevos || sesionesNuevas) CacheService.getScriptCache().remove('evaluaciones');
+  Logger.log(resumen.length ? `Se leyeron ${resumen.length} planillas nuevas.` : 'No había planillas nuevas.');
+  if (resumen.length || sesionesNuevas) CacheService.getScriptCache().remove('evaluaciones');
+  return { sesiones: sesionesNuevas, planillas: resumen };
 }
 
 /** Muestra en el registro lo que se lee del PDF más nuevo de la carpeta, sin escribir nada en la planilla. */

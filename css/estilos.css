@@ -120,6 +120,14 @@ button, input, select { font: inherit; color: inherit; }
 .mal { color: var(--mal) !important; }
 .neutro { color: var(--texto-2) !important; }
 .aviso { color: var(--aviso) !important; }
+.lista { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
+.duracion { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.duracion input { width: 5.5em; text-align: right; }
+#tabla-sesiones td:first-child, #tabla-sesiones .sub { white-space: normal; }
+#tabla-sesiones input { width: 4.2em; }
+#tabla-sesiones td, #tabla-sesiones th { padding-inline: 6px; }
+.duracion .boton { padding: 4px 12px; font-size: 13px; }
+.duracion .boton:disabled { opacity: .35; cursor: default; filter: none; }
 .pill { display: inline-block; padding: 1px 10px; border: 1px solid currentColor; border-radius: 999px; font-size: 13px; white-space: nowrap; }
 
 /* Controles */

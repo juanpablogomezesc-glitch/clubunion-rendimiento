@@ -74,3 +74,11 @@ test('sin datos o con error de la planilla no se rompe', () => {
   assert.equal(K.preparar({ error: 'x' }, '2026-10-18').error, 'x');
   assert.equal(K.preparar({ sesiones: [], partidos: [], rpe: [], plantel: [] }, '2026-10-18').vacio, true);
 });
+
+test('sesiones de las últimas 2 semanas, con respuestas', () => {
+  const m = K.preparar({ ...semanas(3, 1), novedades: [{ fecha: '', texto: 'x' }] }, '2026-10-18');
+  assert.equal(m.sesionesRecientes.length, 6);
+  assert.equal(m.sesionesRecientes[0].fecha, '2026-10-16'); // la más nueva primero
+  assert.equal(m.sesionesRecientes[0].respuestas, 1);
+  assert.equal(m.novedades.length, 1);
+});

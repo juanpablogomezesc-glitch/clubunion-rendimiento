@@ -58,7 +58,9 @@ test('si falta una columna avisa', () => {
 
 test('Sesiones: fecha, tipo y duración', () => {
   const filas = [['Fecha', 'Tipo', 'Duración (min)', 'Nota'], ['03/11/2026', 'Entrenamiento', 90, ''], ['04/11/2026', 'Gimnasio', '', 'sin cargar']];
-  assert.deepEqual(S.leerSesiones_(filas), [{ fecha: '2026-11-03', tipo: 'Entrenamiento', duracion: 90 }]);
+  assert.deepEqual(S.leerSesiones_(filas), [{ fecha: '2026-11-03', tipo: 'Entrenamiento', duracion: 90, automatica: false }]);
+  const auto = [['Fecha', 'Tipo', 'Duración (min)', 'Nota'], ['29/10/2026', 'Entrenamiento', 90, 'Agregada sola por las respuestas del formulario']];
+  assert.equal(S.leerSesiones_(auto)[0].automatica, true);
 });
 
 test('Partidos: una columna por jugador, vacío = no jugó', () => {

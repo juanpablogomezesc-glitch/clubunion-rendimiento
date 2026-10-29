@@ -150,6 +150,8 @@
     $('#carga-form').hidden = !CG.formulario;
     $('#link-form').value = CG.formulario || '';
     for (const id of ['#tarjetas-carga', '#carga-equipo-tarjeta', '#carga-jugadores-tarjeta']) $(id).hidden = CG.vacio;
+    if (CG.error) return;
+    sesionesYNovedades();
     if (CG.vacio) return;
 
     const tarjeta = (etiqueta, numero, unidad, detalle, cls) => {
@@ -193,6 +195,74 @@
       return tr;
     }));
   }
+
+  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const conDia = (f) => `${DIAS[new Date(f + 'T12:00:00Z').getUTCDay()]} ${fechaCorta(f)}`;
+
+  async function enviar(datos) {
+    const r = await fetch(window.CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ ...datos, clave }), credentials: 'omit', referrerPolicy: 'no-referrer' });
+    return r.json();
+  }
+
+  function sesionesYNovedades() {
+    const nov = CG.novedades || [];
+    $('#novedades-tarjeta').hidden = !nov.length;
+    $('#novedades').replaceChildren(...nov.map((n) => el('li', null, (n.fecha ? fechaCorta(n.fecha) + ' · ' : '') + n.texto)));
+    const ses = CG.sesionesRecientes || [];
+    $('#sesiones-tarjeta').hidden = !ses.length;
+    $('#tabla-sesiones tbody').replaceChildren(...ses.map((x) => {
+      const tr = el('tr'), td = el('td', 'num'), caja = el('span', 'duracion');
+      const input = el('input'); input.type = 'number'; input.min = '1'; input.max = '300'; input.value = String(x.duracion);
+      input.setAttribute('aria-label', `Duración de ${x.tipo} del ${fechaCorta(x.fecha)}`);
+      const b = el('button', 'boton', 'Guardar'); b.type = 'button'; b.disabled = true;
+      input.addEventListener('input', () => { b.disabled = !(+input.value > 0 && +input.value <= 300) || +input.value === x.duracion; });
+      b.addEventListener('click', async () => {
+        if (demo) { b.textContent = 'Ejemplo'; return; }
+        b.disabled = true; b.textContent = 'Guardando…';
+        try {
+          const j = await enviar({ accion: 'duracion', fecha: x.fecha, tipo: x.tipo, duracion: +input.value });
+          if (!j.ok) throw new Error(j.error);
+          b.textContent = 'Guardado';
+          cargar(true);
+        } catch (e) { b.textContent = 'Reintentar'; b.disabled = false; }
+      });
+      caja.append(input, b);
+      td.append(caja);
+      const tipo = el('td'); tipo.append(x.tipo);
+      tipo.append(el('span', 'sub', `${x.respuestas} ${x.respuestas === 1 ? 'respondió' : 'respondieron'}${x.automatica ? ' · duración habitual' : ''}`));
+      const dia = el('td'); dia.append(conDia(x.fecha).split(' ')[0], el('span', 'sub', fechaCorta(x.fecha)));
+      tr.append(dia, tipo, td);
+      return tr;
+    }));
+  }
+
+  $('#pdf-partido').addEventListener('change', async (e) => {
+    const archivo = e.target.files && e.target.files[0], estado = $('#subir-estado');
+    e.target.value = '';
+    if (!archivo) return;
+    if (demo) { estado.textContent = 'En la vista de ejemplo no se suben archivos.'; return; }
+    if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') { estado.textContent = 'Tiene que ser el PDF de estadísticas de la CAP.'; return; }
+    $('#btn-pdf').textContent = 'Leyendo la planilla…';
+    estado.textContent = 'Subiendo y leyendo el PDF. Tarda unos segundos.';
+    try {
+      const datos = await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = mal; r.readAsDataURL(archivo); });
+      const j = await enviar({ accion: 'subirPdf', nombre: archivo.name, datos });
+      if (!j.ok) throw new Error(j.error);
+      const p = (j.resultado.planillas || [])[0];
+      if (!p) estado.textContent = 'Se subió, pero no había nada nuevo para leer.';
+      else if (p.error) estado.textContent = p.error;
+      else {
+        estado.textContent = `Listo: ${p.rival} (${p.local ? 'local' : 'visitante'}), ${fechaCorta(p.fecha)}, ${p.jugadores} jugadores.` +
+          (p.nuevos.length ? ` Jugadores nuevos: ${p.nuevos.join(', ')}.` : '') +
+          (p.fechaDudosa ? ' Nadie respondió el formulario como "Partido" esa semana, así que la fecha es la de hoy: corregila en Sesiones si hace falta.' : '');
+        cargar(true);
+      }
+    } catch (err) {
+      estado.textContent = `No se pudo cargar: ${err.message || 'sin conexión'}.`;
+    } finally {
+      $('#btn-pdf').textContent = 'Elegir PDF';
+    }
+  });
 
   function cargaJugador(j) {
     const caja = $('#hoja-carga');

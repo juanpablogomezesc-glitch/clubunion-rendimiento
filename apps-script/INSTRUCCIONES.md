@@ -53,7 +53,9 @@ Una sola vez:
 3. Si está bien, ejecutá **activarLecturaAutomatica**. Desde ahí, cada hora el script lee los PDF nuevos de la carpeta.
 4. **Implementar > Administrar implementaciones > lápiz > Versión: Nueva versión > Implementar.**
 
-Después de cada partido:
+Después de cada partido, lo más simple es subir el PDF **desde la página** (pestaña Carga > Subir planilla del partido): se guarda en la carpeta y se lee en el momento. También se puede subir a la carpeta desde Drive; en ese caso se lee dentro de la hora.
+
+Detalle de lo que pasa:
 - La **fecha** del partido sale de la fila "Partido" de Sesiones, que se crea sola cuando los jugadores responden el formulario eligiendo "Partido" (el PDF no trae la fecha).
 - Subí el PDF a la carpeta **Planillas de partido (PDF)** (desde el celular con la app de Drive).
 - En menos de una hora aparecen los minutos en **Partidos** y todas las métricas en la pestaña **Estadísticas**.

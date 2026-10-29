@@ -125,9 +125,16 @@
     const fUlt = fechasPartido[fechasPartido.length - 1];
     const ultimoPartido = fUlt ? { fecha: fUlt, rival: (partidos.find((p) => p.fecha === fUlt) || {}).rival || '', jugaron: partidos.filter((p) => p.fecha === fUlt && p.minutos > 0).length } : null;
 
+    // Sesiones de las últimas 2 semanas, con cuántos respondieron (la duración se puede corregir desde la página)
+    const sesionesRecientes = sesiones.filter((s) => entre(s.fecha, sumarDias(hoy, -13), hoy))
+      .map((s) => ({ ...s, respuestas: regs.filter((r) => r.fecha === s.fecha && r.tipo === s.tipo).length }))
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+
     return {
       vacio,
       error: null,
+      sesionesRecientes,
+      novedades: c.novedades || [],
       hoy,
       formulario: c.formulario || '',
       registros: regs,

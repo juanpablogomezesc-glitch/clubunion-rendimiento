@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=5">
+  <link rel="stylesheet" href="css/estilos.css?v=6">
 </head>
 <body>
   <div class="franjas" aria-hidden="true"></div>
@@ -203,6 +203,21 @@
       <!-- CARGA -->
       <section class="panel" id="carga" role="tabpanel" hidden>
         <p class="nota nota-error" id="carga-error" hidden></p>
+        <div class="grilla">
+          <article class="tarjeta" id="subir-tarjeta">
+            <h2 class="subtitulo">Subir planilla del partido</h2>
+            <p class="nota">El PDF de estadísticas de la app de la CAP. Se cargan solos los minutos y las estadísticas de Unión.</p>
+            <div>
+              <label class="boton" for="pdf-partido" id="btn-pdf">Elegir PDF</label>
+              <input id="pdf-partido" class="sr" type="file" accept="application/pdf,.pdf">
+            </div>
+            <p class="nota" id="subir-estado" role="status"></p>
+          </article>
+          <article class="tarjeta tarjeta-alerta" id="novedades-tarjeta" hidden>
+            <h2 class="subtitulo">Para revisar</h2>
+            <ul class="lista" id="novedades"></ul>
+          </article>
+        </div>
         <article class="tarjeta" id="carga-vacio" hidden>
           <h2 class="subtitulo">Todavía no hay datos de carga</h2>
           <p>Esta sección se arma sola a medida que cargás las sesiones y los partidos en la planilla CARGA PRIMERA y los jugadores completan el formulario después de cada sesión. Con una semana ya se ve la carga semanal; con cinco, la relación aguda:crónica de cada jugador.</p>
@@ -231,6 +246,21 @@
               <thead><tr>
                 <th>Jugador</th><th class="num">Últimos 7 días</th><th class="num">Promedio semanal</th><th class="num">Aguda:crónica</th><th class="num">RPE medio</th><th class="num">Minutos jugados</th><th class="num">Último partido</th>
               </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="tarjeta" id="sesiones-tarjeta" hidden>
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Sesiones de las últimas 2 semanas</h2>
+              <p class="nota">Se crean solas con las respuestas del formulario y la duración habitual. Si una sesión duró distinto, cambiá los minutos y tocá Guardar.</p>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla" id="tabla-sesiones">
+              <thead><tr><th>Fecha</th><th>Sesión</th><th class="num">Minutos</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -335,10 +365,10 @@
   <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <script src="js/vendor/d3-7.9.0.min.js"></script>
-  <script src="js/config.js?v=5"></script>
-  <script src="js/calculos.js?v=5"></script>
-  <script src="js/carga.js?v=5"></script>
-  <script src="js/graficos.js?v=5"></script>
-  <script src="js/app.js?v=5"></script>
+  <script src="js/config.js?v=6"></script>
+  <script src="js/calculos.js?v=6"></script>
+  <script src="js/carga.js?v=6"></script>
+  <script src="js/graficos.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>
