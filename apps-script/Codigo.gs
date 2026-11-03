@@ -48,6 +48,8 @@ function fecha_(v, zona) {
   if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) {
     return typeof Utilities !== 'undefined' ? Utilities.formatDate(v, zona || 'America/Argentina/Buenos_Aires', 'yyyy-MM-dd') : v.toISOString().slice(0, 10);
   }
+  const iso = /^\s*(\d{4})-(\d{2})-(\d{2})\s*$/.exec(String(v == null ? '' : v));
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\s*$/.exec(String(v == null ? '' : v));
   if (!m) return null;
   const anio = m[3].length === 2 ? '20' + m[3] : m[3];
@@ -198,7 +200,12 @@ function parsearPlanilla_(texto, equipo) {
       tapas: +v[13], tapasRecibidas: +v[14], faltas: +v[15], faltasRecibidas: +v[16], valoracion: +v[17], masMenos: +v[18],
     };
   });
-  return { equipos, rival: equipos[1 - propio], local: propio === 0, jugadores };
+  // el resultado sale de las filas TOTALES de cada equipo (en el mismo orden que los equipos)
+  const puntos = [];
+  for (let m, re = /TOTALES \d{1,3}:\d{2}((?: [-+]?\d+(?:\/\d+)?){19})/g; (m = re.exec(t));) puntos.push(+m[1].trim().split(' ')[0]);
+  const suma = jugadores.reduce((x, j) => x + j.puntos, 0);
+  const propios = puntos.length === 2 && puntos[propio] > 0 ? puntos[propio] : suma;
+  return { equipos, rival: equipos[1 - propio], local: propio === 0, jugadores, puntosPropios: propios, puntosRival: puntos.length === 2 ? puntos[1 - propio] : null };
 }
 
 /** "DURIZOTTO, LEANDRO IVALDI" → "Leandro Durizotto" del plantel. Primero la tabla de equivalencias, después apellido + nombre. */
@@ -235,6 +242,34 @@ function sesionesFaltantes_(existentes, rpe, duraciones) {
     out.push({ fecha: r.fecha, tipo: r.tipo, duracion: duraciones[r.tipo] || duraciones.Otro || 60 });
   }
   return out.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+}
+
+/** Huella de un partido para no cargarlo dos veces: rival y minutos y puntos de cada jugador (la app pone otro nombre de archivo cada vez). */
+function firmaPartido_(rival, jugadores) {
+  return normalizar_(rival) + '|' + jugadores.map((j) => `${normalizar_(j.nombre)}:${Number(j.minutos)}:${Number(j.puntos)}`).sort().join(';');
+}
+
+/** Pestaña Estadísticas → una fila por jugador y partido (para la página). */
+function leerEstadisticas_(filas, zona) {
+  const t = filas[0] || [];
+  const col = (n) => columna_(t, [n]);
+  const c = { f: col('Fecha'), r: col('Rival'), co: col('Condición'), j: col('Jugador'), ti: col('Titular'), m: col('Minutos'), pts: col('Puntos'),
+    t2c: col('2P conv'), t2i: col('2P int'), t3c: col('3P conv'), t3i: col('3P int'), tlc: col('TL conv'), tli: col('TL int'),
+    rd: col('Reb def'), ro: col('Reb of'), rt: col('Reb tot'), as: col('Asistencias'), rec: col('Recuperos'), per: col('Pérdidas'),
+    tap: col('Tapas'), fal: col('Faltas'), val: col('Valoración'), mm: col('+/-'), pe: col('Puntos equipo'), pr: col('Puntos rival') };
+  if (c.f < 0 || c.j < 0 || c.m < 0) return [];
+  const n = (f, i) => (i >= 0 ? numero_(f[i]) : null);
+  const out = [];
+  for (const f of filas.slice(1)) {
+    const fecha = fecha_(f[c.f], zona), jugador = nombre_(f[c.j]);
+    if (!fecha || !jugador) continue;
+    out.push({ fecha, rival: nombre_(f[c.r]), local: normalizar_(f[c.co]) === 'local', jugador, titular: normalizar_(f[c.ti]) === 'si',
+      minutos: n(f, c.m) || 0, puntos: n(f, c.pts) || 0, t2c: n(f, c.t2c) || 0, t2i: n(f, c.t2i) || 0, t3c: n(f, c.t3c) || 0, t3i: n(f, c.t3i) || 0,
+      tlc: n(f, c.tlc) || 0, tli: n(f, c.tli) || 0, rebDef: n(f, c.rd) || 0, rebOf: n(f, c.ro) || 0, rebTot: n(f, c.rt) || 0,
+      asistencias: n(f, c.as) || 0, recuperos: n(f, c.rec) || 0, perdidas: n(f, c.per) || 0, tapas: n(f, c.tap) || 0, faltas: n(f, c.fal) || 0,
+      valoracion: n(f, c.val) || 0, masMenos: n(f, c.mm) || 0, puntosEquipo: n(f, c.pe), puntosRival: n(f, c.pr) });
+  }
+  return out;
 }
 
 /** La planilla no trae la fecha: es la del último "Partido" de Sesiones en la semana antes de subir el PDF. */
@@ -277,6 +312,7 @@ function leerCarga_() {
       plantel: valores(ss.getSheetByName('Plantel')).slice(1).filter((f) => nombre_(f[0]) && normalizar_(f[1]) !== 'no').map((f) => nombre_(f[0])),
       formulario: PropertiesService.getScriptProperties().getProperty('FORM_URL') || '',
       novedades: novedades_(ss, zona),
+      estadisticas: ss.getSheetByName('Estadísticas') ? leerEstadisticas_(ss.getSheetByName('Estadísticas').getDataRange().getValues(), zona) : [],
     };
   } catch (err) {
     return { error: String(err && err.message || err) };
@@ -411,7 +447,7 @@ function generarClaves() {
 
 // ---------- Lectura de los PDF de la CABB ----------
 
-const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota'];
+const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota', 'Puntos equipo', 'Puntos rival'];
 
 function hojaConTitulos_(ss, nombre, titulos) {
   let h = ss.getSheetByName(nombre);
@@ -481,12 +517,21 @@ function procesarPlanillas() {
   const sesionesNuevas = completarSesiones_(ss, zona);
   if (sesionesNuevas) Logger.log(`Se agregaron ${sesionesNuevas} sesiones a partir del formulario.`);
   const est = hojaConTitulos_(ss, 'Estadísticas', TITULOS_ESTADISTICAS);
+  if (est.getMaxColumns() < TITULOS_ESTADISTICAS.length) est.insertColumnsAfter(est.getMaxColumns(), TITULOS_ESTADISTICAS.length - est.getMaxColumns());
+  if (est.getLastColumn() < TITULOS_ESTADISTICAS.length) est.getRange(1, 1, 1, TITULOS_ESTADISTICAS.length).setValues([TITULOS_ESTADISTICAS]).setFontWeight('bold');
   const eqv = hojaConTitulos_(ss, 'Equivalencias', ['Nombre en la planilla CABB', 'Jugador']);
   const hPlantel = ss.getSheetByName('Plantel'), hPartidos = ss.getSheetByName('Partidos');
   const colArchivo = TITULOS_ESTADISTICAS.indexOf('Archivo');
   const leidos = est.getDataRange().getValues().slice(1);
   const procesados = new Set(leidos.map((f) => String(f[colArchivo])));
   const usadas = new Set(leidos.map((f) => fecha_(f[0], zona)).filter(Boolean));
+  // partidos ya cargados, por su huella
+  const yaCargados = {};
+  const porArchivo = {};
+  leidos.forEach((f) => { if (nombre_(f[4])) (porArchivo[f[colArchivo]] = porArchivo[f[colArchivo]] || []).push(f); });
+  Object.values(porArchivo).forEach((fs) => {
+    yaCargados[firmaPartido_(fs[0][1], fs.map((f) => ({ nombre: f[4], minutos: numero_(f[6]), puntos: numero_(f[7]) })))] = fecha_(fs[0][0], zona);
+  });
   const fechasPartido = leerSesiones_(ss.getSheetByName('Sesiones').getDataRange().getValues(), zona).filter((x) => x.tipo === 'Partido').map((x) => x.fecha);
 
   const archivos = DriveApp.getFolderById(CARPETA_PDF).getFilesByType(MimeType.PDF);
@@ -499,6 +544,13 @@ function procesarPlanillas() {
     if (!p.jugadores.length) {
       est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `No se pudo leer "${archivo.getName()}": ¿es la planilla de la CABB con ${EQUIPO}?`]);
       resumen.push({ archivo: archivo.getName(), error: `No se pudo leer: ¿es la planilla de estadísticas de la CABB de un partido de ${EQUIPO}?` });
+      continue;
+    }
+    const repetido = yaCargados[firmaPartido_(p.rival, p.jugadores)];
+    if (repetido !== undefined) {
+      const cuando = repetido ? repetido.split('-').reverse().slice(0, 2).join('/') : '';
+      est.appendRow(['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', archivo.getId(), `Planilla repetida: es el mismo partido contra ${p.rival}${cuando ? ' del ' + cuando : ''}. No se cargó de nuevo.`]);
+      resumen.push({ archivo: archivo.getName(), repetido: true, rival: p.rival, fecha: repetido });
       continue;
     }
     const fechaSesion = fechaPartido_(subido, fechasPartido, usadas);
@@ -525,7 +577,7 @@ function procesarPlanillas() {
       if (!equivalencias[normalizar_(j.nombre)]) { eqv.appendRow([j.nombre, jugador]); equivalencias[normalizar_(j.nombre)] = jugador; }
       j.jugador = jugador;
       return [fecha, rival, p.local ? 'Local' : 'Visitante', jugador, j.nombre, j.titular ? 'Sí' : '', j.minutos, j.puntos, j.t2c, j.t2i, j.t3c, j.t3i, j.tlc, j.tli,
-        j.rebDef, j.rebOf, j.rebTot, j.asistencias, j.recuperos, j.perdidas, j.tapas, j.tapasRecibidas, j.faltas, j.faltasRecibidas, j.valoracion, j.masMenos, archivo.getId(), nota.trim()];
+        j.rebDef, j.rebOf, j.rebTot, j.asistencias, j.recuperos, j.perdidas, j.tapas, j.tapasRecibidas, j.faltas, j.faltasRecibidas, j.valoracion, j.masMenos, archivo.getId(), nota.trim(), p.puntosPropios, p.puntosRival];
     });
     est.getRange(est.getLastRow() + 1, 1, filas.length, filas[0].length).setValues(filas);
 
@@ -542,7 +594,8 @@ function procesarPlanillas() {
       hPartidos.getRange(fila, 1, 1, 2).setValues([[new Date(a, m - 1, d), rival]]);
     }
     p.jugadores.forEach((j) => hPartidos.getRange(fila, titulos.indexOf(j.jugador) + 1).setValue(j.minutos));
-    resumen.push({ archivo: archivo.getName(), fecha, fechaDudosa: !fechaSesion, rival, local: p.local, jugadores: p.jugadores.length, nuevos: jugadoresNuevos });
+    yaCargados[firmaPartido_(p.rival, p.jugadores)] = fecha;
+    resumen.push({ archivo: archivo.getName(), fecha, fechaDudosa: !fechaSesion, rival, local: p.local, jugadores: p.jugadores.length, nuevos: jugadoresNuevos, puntosPropios: p.puntosPropios, puntosRival: p.puntosRival });
   }
   Logger.log(resumen.length ? `Se leyeron ${resumen.length} planillas nuevas.` : 'No había planillas nuevas.');
   if (resumen.length || sesionesNuevas) CacheService.getScriptCache().remove('evaluaciones');
@@ -620,4 +673,4 @@ function probarLectura() {
   else Logger.log(`Carga: ${d.carga.sesiones.length} sesiones · ${d.carga.partidos.length} minutos de partido · ${d.carga.rpe.length} respuestas de RPE`);
 }
 
-if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_, sesionesFaltantes_ };
+if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_, sesionesFaltantes_, firmaPartido_, leerEstadisticas_ };

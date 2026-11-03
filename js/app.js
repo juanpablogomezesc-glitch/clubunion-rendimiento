@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const C = window.Calculos, G = window.Graficos, K = window.Carga, nf = G.nf;
+  const C = window.Calculos, G = window.Graficos, K = window.Carga, P = window.Partidos, nf = G.nf;
   const $ = (s) => document.querySelector(s);
   const el = (tag, cls, texto) => { const e = document.createElement(tag); if (cls) e.className = cls; if (texto != null) e.textContent = texto; return e; };
   const signo = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '') + nf(Math.abs(v), d);
@@ -26,10 +26,11 @@
     ['Fuerza tren inferior', ['Sentadilla 80 kg', 'Sentadilla 100 kg']],
     ['Fuerza tren superior', ['Press plano 60 kg', 'Press plano 80 kg']],
   ];
-  const PESTANAS = ['resumen', 'resistencia', 'saltos', 'fuerza', 'carga', 'jugador', 'leer'];
+  const PESTANAS = ['resumen', 'resistencia', 'saltos', 'fuerza', 'carga', 'partidos', 'jugador', 'leer'];
 
   let M = null; // modelo calculado
   let CG = null; // carga calculada
+  let PT = { partidos: [], promedios: [] }; // estadísticas de partido
   const estado = {
     pestana: 'resumen',
     jugador: null,
@@ -276,11 +277,92 @@
     G.semanas($('#g-carga-j'), d.semanal, { vacio: 'Todavía no respondiste el formulario en estas semanas.' });
   }
 
+  // ---------- Partidos ----------
+  const tiro = (c, i) => `${c}/${i}`;
+  const conSigno = (v) => (v > 0 ? '+' : '') + v;
+
+  function partidos() {
+    const hay = PT.partidos.length > 0;
+    $('#partidos-vacio').hidden = hay;
+    $('#partidos-contenido').hidden = !hay;
+    if (!hay) return;
+    const sel = $('#sel-partido');
+    const ids = PT.partidos.map((p) => p.id);
+    if (sel.options.length !== ids.length) sel.replaceChildren(...PT.partidos.map((p) => new Option(`${fechaCorta(p.fecha)} · ${p.rival}`, p.id)));
+    if (!ids.includes(estado.partido)) estado.partido = ids[0];
+    sel.value = estado.partido;
+    const p = PT.partidos.find((x) => x.id === estado.partido), t = p.totales;
+
+    const m = $('#marcador'), eq = el('div', 'equipos');
+    const propio = el('span', 'equipo', 'Unión'), riv = el('span', 'equipo', p.rival);
+    const tanteador = el('span', 'tanteador', p.puntosRival != null ? `${p.puntosEquipo} – ${p.puntosRival}` : `${p.puntosEquipo}`);
+    if (p.local) eq.append(propio, tanteador, riv); else eq.append(riv, el('span', 'tanteador', p.puntosRival != null ? `${p.puntosRival} – ${p.puntosEquipo}` : `${p.puntosEquipo}`), propio);
+    const info = el('div');
+    info.append(el('p', 'etiqueta', `${p.local ? 'Local' : 'Visitante'} · ${conDia(p.fecha)}`));
+    if (p.resultado) info.append(el('p', 'numero ' + (p.resultado === 'Ganó' ? 'ok' : p.resultado === 'Perdió' ? 'mal' : 'neutro'), p.resultado));
+    info.className = 'dato';
+    m.replaceChildren(eq, info);
+
+    const dato = (etiqueta, numero, detalle) => {
+      const d = el('article', 'tarjeta dato');
+      d.append(el('p', 'etiqueta', etiqueta), el('p', 'numero', numero));
+      if (detalle) d.append(el('p', 'detalle', detalle));
+      return d;
+    };
+    $('#tarjetas-partido').replaceChildren(
+      dato('Tiros de 2', t.p2 != null ? `${t.p2} %` : '—', tiro(t.t2c, t.t2i)),
+      dato('Tiros de 3', t.p3 != null ? `${t.p3} %` : '—', tiro(t.t3c, t.t3i)),
+      dato('Libres', t.ptl != null ? `${t.ptl} %` : '—', tiro(t.tlc, t.tli)),
+      dato('Rebotes', String(t.rebTot), `${t.rebOf} ofensivos`),
+      dato('Asistencias', String(t.asistencias), `${t.perdidas} pérdidas`),
+      dato('Recuperos', String(t.recuperos), `${t.faltas} faltas`),
+    );
+
+    const maxPts = Math.max(...p.jugadores.map((j) => j.puntos));
+    $('#tabla-partido tbody').replaceChildren(...p.jugadores.map((j) => {
+      const tr = el('tr'), nom = el('td');
+      tr.dataset.jugador = j.jugador; tr.tabIndex = 0;
+      if (j.titular) nom.append(el('span', 'estrella', '★'));
+      nom.append(j.jugador);
+      const pts = el('td', 'num' + (j.puntos === maxPts && maxPts > 0 ? ' ok' : ''), String(j.puntos));
+      const fila = j.minutos > 0
+        ? [el('td', 'num', nf(j.minutos, 0)), pts, el('td', 'num', tiro(j.t2c, j.t2i)), el('td', 'num', tiro(j.t3c, j.t3i)), el('td', 'num', tiro(j.tlc, j.tli)),
+          el('td', 'num', String(j.rebTot)), el('td', 'num', String(j.asistencias)), el('td', 'num', String(j.recuperos)), el('td', 'num', String(j.perdidas)),
+          el('td', 'num', String(j.valoracion)), el('td', 'num ' + tono(j.masMenos), conSigno(j.masMenos))]
+        : [el('td', 'num neutro', 'No jugó'), ...Array.from({ length: 10 }, () => el('td', 'num neutro', ''))];
+      tr.append(nom, ...fila);
+      return tr;
+    }));
+
+    $('#nota-promedios').textContent = `${PT.partidos.length} ${PT.partidos.length === 1 ? 'partido' : 'partidos'} cargados. Por partido jugado (los partidos sin minutos no cuentan). Los porcentajes son de todo el torneo.`;
+    $('#tabla-promedios tbody').replaceChildren(...PT.promedios.filter((r) => r.jugados).map((r) => {
+      const tr = el('tr'); tr.dataset.jugador = r.jugador; tr.tabIndex = 0;
+      const pc = (v) => el('td', 'num' + (v == null ? ' neutro' : ''), v == null ? '—' : String(v));
+      tr.append(el('td', null, r.jugador), el('td', 'num', String(r.jugados)), el('td', 'num', nf(r.minutos, 1)), el('td', 'num', nf(r.puntos, 1)),
+        el('td', 'num', nf(r.rebotes, 1)), el('td', 'num', nf(r.asistencias, 1)), el('td', 'num', nf(r.valoracion, 1)), pc(r.p2), pc(r.p3), pc(r.ptl));
+      return tr;
+    }));
+  }
+
+  function partidosJugador(j) {
+    const r = PT.promedios.find((x) => x.jugador === j);
+    $('#hoja-partidos').hidden = !r;
+    if (!r) return;
+    const ult = PT.partidos.map((p) => ({ p, f: p.jugadores.find((x) => x.jugador === j) })).find((x) => x.f);
+    $('#hoja-partidos-nota').textContent = r.jugados
+      ? `${r.jugados} ${r.jugados === 1 ? 'partido jugado' : 'partidos jugados'} de ${r.convocado}. Promedios por partido.` + (ult && ult.f.minutos > 0 ? ` Último: ${ult.f.puntos} puntos en ${nf(ult.f.minutos, 0)} minutos contra ${ult.p.rival}.` : '')
+      : `Convocado a ${r.convocado} ${r.convocado === 1 ? 'partido' : 'partidos'}, todavía sin minutos.`;
+    const dato = (etiqueta, numero) => { const d = el('article', 'tarjeta dato'); d.append(el('p', 'etiqueta', etiqueta), el('p', 'numero', numero)); return d; };
+    $('#hoja-partidos-datos').replaceChildren(...(r.jugados ? [dato('Minutos', nf(r.minutos, 1)), dato('Puntos', nf(r.puntos, 1)), dato('Rebotes', nf(r.rebotes, 1)), dato('Asistencias', nf(r.asistencias, 1))] : []));
+  }
+
   // ---------- Hoja del jugador ----------
   function jugador() {
     const sel = $('#sel-jugador');
-    if (sel.options.length !== M.jugadores.length) sel.replaceChildren(...M.jugadores.map((j) => new Option(j, j)));
-    if (!M.jugadores.includes(estado.jugador)) estado.jugador = M.jugadores[0];
+    // todos: los evaluados, los que tienen carga y los que jugaron partidos
+    const todos = [...new Set([...M.jugadores, ...(CG && !CG.vacio ? CG.jugadores.map((x) => x.jugador) : []), ...PT.promedios.map((x) => x.jugador)])].sort((a, b) => a.localeCompare(b, 'es'));
+    if (sel.options.length !== todos.length) sel.replaceChildren(...todos.map((j) => new Option(j, j)));
+    if (!todos.includes(estado.jugador)) estado.jugador = todos[0];
     sel.value = estado.jugador;
     const j = estado.jugador;
     const mios = M.valores.filter((r) => r.jugador === j);
@@ -345,13 +427,14 @@
       G.perfil($(id), filas, { color, nombre });
     }
     cargaJugador(j);
+    partidosJugador(j);
     const sj = M.mejores.filter((r) => r.jugador === j);
     leyenda($('#g-saltos-j').parentElement.querySelector('[data-leyenda]'), periodosDe(sj));
     G.saltos($('#g-saltos-j'), sj, { color, nombre });
   }
 
   // ---------- Navegación ----------
-  const DIBUJAR = { resumen, resistencia, saltos, fuerza, carga, jugador, leer: () => {} };
+  const DIBUJAR = { resumen, resistencia, saltos, fuerza, carga, partidos, jugador, leer: () => {} };
   function dibujar() { if (M) DIBUJAR[estado.pestana](); }
 
   function mostrarPestana(p, desdeHash) {
@@ -373,6 +456,11 @@
   const abrirJugador = (tr) => { if (!tr) return; estado.jugador = tr.dataset.jugador; mostrarPestana('jugador'); window.scrollTo(0, 0); };
   $('#tabla-alertas tbody').addEventListener('click', (e) => abrirJugador(e.target.closest('tr[data-jugador]')));
   $('#tabla-carga tbody').addEventListener('click', (e) => abrirJugador(e.target.closest('tr[data-jugador]')));
+  for (const id of ['#tabla-partido tbody', '#tabla-promedios tbody']) {
+    $(id).addEventListener('click', (e) => abrirJugador(e.target.closest('tr[data-jugador]')));
+    $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
+  }
+  $('#sel-partido').addEventListener('change', (e) => { estado.partido = e.target.value; dibujar(); });
   $('#tabla-carga tbody').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
   $('#btn-copiar').addEventListener('click', () => {
     const i = $('#link-form');
@@ -413,6 +501,8 @@
     M = C.preparar(datos);
     const hoy = demo && datos.carga ? K.ultimaFecha(datos.carga) : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
     CG = K.preparar(datos.carga, hoy || new Date().toISOString().slice(0, 10));
+    const est = (datos.carga && datos.carga.estadisticas) || [];
+    PT = { partidos: P.partidos(est), promedios: P.promedios(est) };
     $('#cargando').hidden = true;
     $('#acceso').hidden = true;
     $('#app').hidden = false;

@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=7">
+  <link rel="stylesheet" href="css/estilos.css?v=8">
 </head>
 <body>
   <div class="franjas" aria-hidden="true"></div>
@@ -67,6 +67,7 @@
         <button class="pestana" role="tab" data-tab="saltos" aria-selected="false">Saltos</button>
         <button class="pestana" role="tab" data-tab="fuerza" aria-selected="false">Fuerza</button>
         <button class="pestana" role="tab" data-tab="carga" aria-selected="false">Carga</button>
+        <button class="pestana" role="tab" data-tab="partidos" aria-selected="false">Partidos</button>
         <button class="pestana" role="tab" data-tab="jugador" aria-selected="false">Jugador</button>
         <button class="pestana" role="tab" data-tab="leer" aria-selected="false">Cómo leerlo</button>
       </div>
@@ -276,6 +277,44 @@
         </article>
       </section>
 
+      <!-- PARTIDOS -->
+      <section class="panel" id="partidos" role="tabpanel" hidden>
+        <article class="tarjeta" id="partidos-vacio" hidden>
+          <h2 class="subtitulo">Todavía no hay partidos cargados</h2>
+          <p>Subí el PDF de estadísticas de la app de la CABB desde la pestaña Carga y el partido aparece acá con todos los números de cada jugador.</p>
+        </article>
+        <div id="partidos-contenido">
+          <div class="barra-jugador">
+            <div class="control">
+              <label for="sel-partido">Partido</label>
+              <select id="sel-partido"></select>
+            </div>
+          </div>
+          <article class="tarjeta marcador" id="marcador"></article>
+          <div class="mosaico mosaico-4" id="tarjetas-partido"></div>
+          <article class="tarjeta">
+            <h2 class="subtitulo">Planilla del partido</h2>
+            <p class="nota">★ titular. Tiros: convertidos/intentados.</p>
+            <div class="tabla-caja">
+              <table class="tabla tabla-clic" id="tabla-partido">
+                <thead><tr><th>Jugador</th><th class="num">Min</th><th class="num">Pts</th><th class="num">2P</th><th class="num">3P</th><th class="num">TL</th><th class="num">Reb</th><th class="num">Ast</th><th class="num">Rec</th><th class="num">Pér</th><th class="num">Val</th><th class="num">+/-</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="tarjeta">
+            <h2 class="subtitulo">Promedios del torneo</h2>
+            <p class="nota" id="nota-promedios">Por partido jugado (los partidos sin minutos no cuentan). Los porcentajes son de todo el torneo.</p>
+            <div class="tabla-caja">
+              <table class="tabla tabla-clic" id="tabla-promedios">
+                <thead><tr><th>Jugador</th><th class="num">PJ</th><th class="num">Min</th><th class="num">Pts</th><th class="num">Reb</th><th class="num">Ast</th><th class="num">Val</th><th class="num">2P %</th><th class="num">3P %</th><th class="num">TL %</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <!-- JUGADOR -->
       <section class="panel" id="jugador" role="tabpanel" hidden>
         <div class="barra-jugador">
@@ -302,6 +341,12 @@
             <h3 class="subtitulo">Tus distancias de entrenamiento</h3>
             <p class="nota" id="hoja-int-nota"></p>
             <div class="mosaico mosaico-4" id="hoja-intervalos"></div>
+          </article>
+
+          <article class="tarjeta" id="hoja-partidos" hidden>
+            <h3 class="subtitulo">En los partidos</h3>
+            <p class="nota" id="hoja-partidos-nota"></p>
+            <div class="mosaico mosaico-4" id="hoja-partidos-datos"></div>
           </article>
 
           <article class="tarjeta" id="hoja-carga" hidden>
@@ -365,10 +410,11 @@
   <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <script src="js/vendor/d3-7.9.0.min.js"></script>
-  <script src="js/config.js?v=7"></script>
-  <script src="js/calculos.js?v=7"></script>
-  <script src="js/carga.js?v=7"></script>
-  <script src="js/graficos.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/config.js?v=8"></script>
+  <script src="js/calculos.js?v=8"></script>
+  <script src="js/carga.js?v=8"></script>
+  <script src="js/partidos.js?v=8"></script>
+  <script src="js/graficos.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

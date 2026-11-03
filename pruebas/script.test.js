@@ -174,3 +174,30 @@ test('sesiones que faltan: una por día y tipo con respuestas, con la duración 
     { fecha: '2026-10-30', tipo: 'Otro', duracion: 45 },
   ]);
 });
+
+test('planilla de la CABB: resultado del partido', () => {
+  const p = S.parsearPlanilla_(planilla, 'UNION DE SANTO TOME');
+  assert.deepEqual([p.puntosPropios, p.puntosRival], [63, 86]);
+});
+
+test('el mismo partido con otro nombre de archivo tiene la misma huella', () => {
+  const a = S.parsearPlanilla_(planilla, 'UNION DE SANTO TOME');
+  const b = S.parsearPlanilla_(planilla.replace(/\*/g, '\\*'), 'UNION DE SANTO TOME');
+  assert.equal(S.firmaPartido_(a.rival, a.jugadores), S.firmaPartido_('Equipo Rival De Prueba', b.jugadores));
+  const otro = S.parsearPlanilla_(planilla.replace('37:31 26', '30:00 20'), 'UNION DE SANTO TOME');
+  assert.notEqual(S.firmaPartido_(a.rival, a.jugadores), S.firmaPartido_(otro.rival, otro.jugadores));
+});
+
+test('Estadísticas → filas para la página (saltea las marcas sin jugador)', () => {
+  const t = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota', 'Puntos equipo', 'Puntos rival'];
+  const filas = [t,
+    ['2026-10-26', 'Rival', 'Local', 'Ana', 'ANA', 'Sí', '37,5', 26, 4, 11, 4, 7, 6, 10, 3, 2, 5, 1, 1, 2, 0, 2, 3, 4, 16, -19, 'x', '', 63, 86],
+    ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'y', 'Planilla repetida']];
+  const r = S.leerEstadisticas_(filas);
+  assert.equal(r.length, 1);
+  assert.deepEqual([r[0].fecha, r[0].local, r[0].titular, r[0].minutos, r[0].puntos, r[0].masMenos, r[0].puntosEquipo, r[0].puntosRival], ['2026-10-26', true, true, 37.5, 26, -19, 63, 86]);
+});
+
+test('fechas en formato AAAA-MM-DD (como las escribe el script)', () => {
+  assert.equal(S.fecha_('2026-10-26'), '2026-10-26');
+});

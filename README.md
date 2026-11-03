@@ -15,6 +15,7 @@ a un script de Google (ver `apps-script/INSTRUCCIONES.md`). Para ver la página 
 | `js/config.js` | La URL del script de Google |
 | `js/calculos.js` | Todos los cálculos, sin tocar la página (se prueban con Node) |
 | `js/carga.js` | Cálculos de carga: RPE × minutos, carga semanal, relación aguda:crónica, minutos jugados |
+| `js/partidos.js` | Estadísticas de partido: planilla de cada partido y promedios del torneo |
 | `js/graficos.js` | Los gráficos (d3) |
 | `js/app.js` | Carga de datos, clave, pestañas y la hoja del jugador |
 | `apps-script/Codigo.gs` | El script que lee DATOS PRIMERA - LIMPIO y CARGA PRIMERA, y crea el formulario de RPE |

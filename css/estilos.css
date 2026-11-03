@@ -120,6 +120,11 @@ button, input, select { font: inherit; color: inherit; }
 .mal { color: var(--mal) !important; }
 .neutro { color: var(--texto-2) !important; }
 .aviso { color: var(--aviso) !important; }
+.marcador { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.marcador .equipos { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; font-family: var(--display); text-transform: uppercase; }
+.marcador .equipo { font-size: 22px; font-weight: 600; }
+.marcador .tanteador { font-size: 52px; font-weight: 700; line-height: 1; }
+.estrella { color: var(--aviso); margin-right: 4px; }
 .lista { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; }
 .duracion { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; }
 .duracion input { width: 5.5em; text-align: right; }
