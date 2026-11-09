@@ -12,7 +12,7 @@
 const PAGINA = 'https://juanpablogomezesc-glitch.github.io/clubunion-rendimiento/'; // dónde está la página
 const SEGUNDOS_EN_MEMORIA = 300;            // una consulta repetida en 5 minutos no vuelve a leer la planilla
 const SEGUNDOS_MINIMOS_ENTRE_LECTURAS = 30; // el botón "Actualizar" no lee la planilla más de una vez cada 30 segundos
-const VERSION = '2026-11-09'; // la página avisa si la implementación publicada es más vieja que esta
+const VERSION = '2026-11-10'; // la página avisa si la implementación publicada es más vieja que esta
 const ID_CARGA = '1I0zUBZIcicYVUmd854eoCoBwNfNuO-43VO1zoi0cPyQ'; // planilla "CARGA PRIMERA" (sesiones, partidos y RPE)
 const CARPETA_PDF = '1WmIe9vu4_c6YkQMtrkreMwSKis__Nq1K';  // carpeta "Planillas de partido (PDF)"
 const EQUIPO = 'UNION DE SANTO TOME';                       // cómo figura el club en la planilla de la CABB
