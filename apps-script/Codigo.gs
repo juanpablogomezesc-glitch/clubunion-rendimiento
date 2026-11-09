@@ -187,7 +187,7 @@ function parsearPlanilla_(texto, equipo) {
   const equipos = ambos ? [limpiar(ambos[1]), limpiar(ambos[2])]
     : [titulo ? limpiar(titulo[1]) : '', totales && entrenadores[1] ? limpiar(t.slice(totales.index + totales[0].length, entrenadores[1])) : ''];
   const propio = equipos.findIndex((e) => normalizar_(e).indexOf(equipo) >= 0);
-  if (propio < 0 || !entrenadores[propio]) return { equipos, rival: '', local: null, jugadores: [] };
+  if (propio < 0 || !entrenadores[propio]) return { equipos, rival: '', local: null, jugadores: [], categoria: categoria_(t) };
   const desde = entrenadores[propio], hasta = entrenadores[propio + 1] || t.length;
   const jugadores = filas.filter((f) => f.pos > desde && f.pos < hasta).map(({ m }) => {
     const v = m[6].trim().split(' ');
@@ -206,10 +206,18 @@ function parsearPlanilla_(texto, equipo) {
   for (let m, re = /TOTALES \d{1,3}:\d{2}((?: [-+]?\d+(?:\/\d+)?){19})/g; (m = re.exec(t));) puntos.push(+m[1].trim().split(' ')[0]);
   const suma = jugadores.reduce((x, j) => x + j.puntos, 0);
   const propios = puntos.length === 2 && puntos[propio] > 0 ? puntos[propio] : suma;
-  return { equipos, rival: equipos[1 - propio], local: propio === 0, jugadores, puntosPropios: propios, puntosRival: puntos.length === 2 ? puntos[1 - propio] : null };
+  return { equipos, rival: equipos[1 - propio], local: propio === 0, jugadores, puntosPropios: propios, puntosRival: puntos.length === 2 ? puntos[1 - propio] : null, categoria: categoria_(t) };
 }
 
 /** "DURIZOTTO, LEANDRO IVALDI" → "Leandro Durizotto" del plantel. Primero la tabla de equivalencias, después apellido + nombre. */
+/** Cantidad de letras a cambiar, agregar o sacar para pasar de a a b. */
+function distancia_(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
 function emparejar_(nombreCap, plantel, equivalencias) {
   const n = normalizar_(nombreCap);
   if (equivalencias && equivalencias[n]) return equivalencias[n];
@@ -220,6 +228,14 @@ function emparejar_(nombreCap, plantel, equivalencias) {
   const conNombre = mismos.filter((j) => noms.length && palabras(j).some((w) => !aps.includes(w) && w.slice(0, 3) === noms[0].slice(0, 3)));
   if (conNombre.length === 1) return conNombre[0];
   if (mismos.length === 1) return mismos[0];
+  // apellido con una letra distinta (la CABB escribe "BARONI" y el plantel "Varoni"), solo si el nombre también coincide
+  if (!mismos.length && aps.length && noms.length) {
+    const parecidos = plantel.filter((j) => {
+      const w = palabras(j);
+      return aps.every((a) => w.some((x) => a.length >= 5 && distancia_(a, x) <= 1)) && w.some((x) => !aps.includes(x) && x.slice(0, 3) === noms[0].slice(0, 3));
+    });
+    if (parecidos.length === 1) return parecidos[0];
+  }
   return null;
 }
 
@@ -245,6 +261,26 @@ function sesionesFaltantes_(existentes, rpe, duraciones) {
   return out.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
 }
 
+/** Categoría del partido según el torneo del título: "U21M ASB ..." → U21; "MM ASB MAYORES ..." → Primera. */
+function categoria_(texto) {
+  const titulo = String(texto).slice(0, 400);
+  const u = /\bU ?(\d{2})/i.exec(titulo);
+  return u ? 'U' + u[1] : 'Primera';
+}
+
+/**
+ * Minutos de partido para la carga: los de las planillas de la CABB (Estadísticas) y, además, los de la pestaña Partidos
+ * que se cargaron a mano (una fecha y rival que no está en Estadísticas). Así un partido no se cuenta dos veces.
+ */
+function combinarMinutos_(partidosPlanilla, estadisticas) {
+  const clave = (f, r) => f + '|' + normalizar_(String(r).replace(/\s*\(U\d{2}\)\s*$/i, ''));
+  const conPlanilla = new Set(estadisticas.map((e) => clave(e.fecha, e.rival)));
+  return [
+    ...estadisticas.map((e) => ({ fecha: e.fecha, rival: e.rival, jugador: e.jugador, minutos: e.minutos, categoria: e.categoria })),
+    ...partidosPlanilla.filter((p) => !conPlanilla.has(clave(p.fecha, p.rival))),
+  ];
+}
+
 /** Huella de un partido para no cargarlo dos veces: rival y minutos y puntos de cada jugador (la app pone otro nombre de archivo cada vez). */
 function firmaPartido_(rival, jugadores) {
   return normalizar_(rival) + '|' + jugadores.map((j) => `${normalizar_(j.nombre)}:${Number(j.minutos)}:${Number(j.puntos)}`).sort().join(';');
@@ -257,7 +293,7 @@ function leerEstadisticas_(filas, zona) {
   const c = { f: col('Fecha'), r: col('Rival'), co: col('Condición'), j: col('Jugador'), ti: col('Titular'), m: col('Minutos'), pts: col('Puntos'),
     t2c: col('2P conv'), t2i: col('2P int'), t3c: col('3P conv'), t3i: col('3P int'), tlc: col('TL conv'), tli: col('TL int'),
     rd: col('Reb def'), ro: col('Reb of'), rt: col('Reb tot'), as: col('Asistencias'), rec: col('Recuperos'), per: col('Pérdidas'),
-    tap: col('Tapas'), fal: col('Faltas'), val: col('Valoración'), mm: col('+/-'), pe: col('Puntos equipo'), pr: col('Puntos rival'), no: col('Nota'), ar: col('Archivo') };
+    tap: col('Tapas'), fal: col('Faltas'), val: col('Valoración'), mm: col('+/-'), pe: col('Puntos equipo'), pr: col('Puntos rival'), no: col('Nota'), ar: col('Archivo'), cat: col('Categoría') };
   if (c.f < 0 || c.j < 0 || c.m < 0) return [];
   const n = (f, i) => (i >= 0 ? numero_(f[i]) : null);
   const out = [];
@@ -269,7 +305,7 @@ function leerEstadisticas_(filas, zona) {
       tlc: n(f, c.tlc) || 0, tli: n(f, c.tli) || 0, rebDef: n(f, c.rd) || 0, rebOf: n(f, c.ro) || 0, rebTot: n(f, c.rt) || 0,
       asistencias: n(f, c.as) || 0, recuperos: n(f, c.rec) || 0, perdidas: n(f, c.per) || 0, tapas: n(f, c.tap) || 0, faltas: n(f, c.fal) || 0,
       valoracion: n(f, c.val) || 0, masMenos: n(f, c.mm) || 0, puntosEquipo: n(f, c.pe), puntosRival: n(f, c.pr),
-      fechaDudosa: c.no >= 0 && /revis[aá] la fecha/i.test(String(f[c.no])), archivo: c.ar >= 0 ? String(f[c.ar]) : '' });
+      fechaDudosa: c.no >= 0 && /revis[aá] la fecha/i.test(String(f[c.no])), archivo: c.ar >= 0 ? String(f[c.ar]) : '', categoria: (c.cat >= 0 && nombre_(f[c.cat])) || 'Primera' });
   }
   return out;
 }
@@ -309,7 +345,10 @@ function leerCarga_() {
     const respuestas = ss.getSheets().find((h) => /^respuestas/i.test(h.getName()));
     return {
       sesiones: leerSesiones_(valores(ss.getSheetByName('Sesiones')), zona),
-      partidos: leerPartidos_(valores(ss.getSheetByName('Partidos')), zona),
+      partidos: (() => {
+        const est = ss.getSheetByName('Estadísticas') ? leerEstadisticas_(ss.getSheetByName('Estadísticas').getDataRange().getValues(), zona) : [];
+        return combinarMinutos_(leerPartidos_(valores(ss.getSheetByName('Partidos')), zona), est);
+      })(),
       rpe: respuestas ? leerRpe_(valores(respuestas), zona) : [],
       plantel: valores(ss.getSheetByName('Plantel')).slice(1).filter((f) => nombre_(f[0]) && normalizar_(f[1]) !== 'no').map((f) => nombre_(f[0])),
       formulario: PropertiesService.getScriptProperties().getProperty('FORM_URL') || '',
@@ -327,25 +366,19 @@ function clavesValidas_() {
   return h.getDataRange().getValues().slice(1).map((f) => String(f[1] || '').trim()).filter((c) => c.length >= 16);
 }
 
-/** Lo que el script hizo solo y conviene mirar: jugadores nuevos y planillas con la fecha dudosa o que no se pudieron leer. */
+/** Lo que conviene mirar: planillas que no se pudieron leer y partidos con la fecha a confirmar. */
 function novedades_(ss, zona) {
   const out = [];
-  const plantel = ss.getSheetByName('Plantel');
-  if (plantel) plantel.getDataRange().getValues().slice(1).forEach((f) => {
-    if (/agregado desde una planilla/i.test(String(f[2]))) out.push({ fecha: '', texto: `${nombre_(f[0])} se agregó al plantel desde una planilla de la CABB. Si el nombre necesita tildes, corregilo en la pestaña Plantel.` });
-  });
   const est = ss.getSheetByName('Estadísticas');
-  if (est) {
-    const vistos = new Set();
-    est.getDataRange().getValues().slice(1).forEach((f) => {
-      const nota = nombre_(f[TITULOS_ESTADISTICAS.indexOf('Nota')]);
-      const fecha = fecha_(f[0], zona) || '';
-      if (/revis[aá] la fecha|no se pudo leer/i.test(nota) && !vistos.has(fecha + nota)) {
-        vistos.add(fecha + nota);
-        out.push({ fecha, texto: nota.replace(/Jugador nuevo: se agregó al Plantel\.\s*/i, '').trim() + (f[1] ? ` (${nombre_(f[1])})` : '') });
-      }
-    });
-  }
+  if (!est) return out;
+  const filas = est.getDataRange().getValues(), t = filas[0], cN = t.indexOf('Nota'), cA = t.indexOf('Archivo');
+  const dudosos = new Set();
+  filas.slice(1).forEach((f) => {
+    const nota = nombre_(f[cN]);
+    if (/no se pudo leer/i.test(nota)) out.push({ fecha: '', texto: nota });
+    else if (/revis[aá] la fecha/i.test(nota)) dudosos.add(String(f[cA]));
+  });
+  if (dudosos.size) out.push({ fecha: '', texto: `${dudosos.size} ${dudosos.size === 1 ? 'partido tiene' : 'partidos tienen'} la fecha a confirmar (las planillas de la CABB no la traen). Corregilas en la pestaña Partidos.` });
   return out;
 }
 
@@ -474,7 +507,7 @@ function generarClaves() {
 
 // ---------- Lectura de los PDF de la CABB ----------
 
-const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota', 'Puntos equipo', 'Puntos rival'];
+const TITULOS_ESTADISTICAS = ['Fecha', 'Rival', 'Condición', 'Jugador', 'Nombre en la planilla', 'Titular', 'Minutos', 'Puntos', '2P conv', '2P int', '3P conv', '3P int', 'TL conv', 'TL int', 'Reb def', 'Reb of', 'Reb tot', 'Asistencias', 'Recuperos', 'Pérdidas', 'Tapas', 'Tapas recibidas', 'Faltas', 'Faltas recibidas', 'Valoración', '+/-', 'Archivo', 'Nota', 'Puntos equipo', 'Puntos rival', 'Categoría'];
 
 function hojaConTitulos_(ss, nombre, titulos) {
   let h = ss.getSheetByName(nombre);
@@ -604,7 +637,7 @@ function procesarPlanillas() {
       if (!equivalencias[normalizar_(j.nombre)]) { eqv.appendRow([j.nombre, jugador]); equivalencias[normalizar_(j.nombre)] = jugador; }
       j.jugador = jugador;
       return [fecha, rival, p.local ? 'Local' : 'Visitante', jugador, j.nombre, j.titular ? 'Sí' : '', j.minutos, j.puntos, j.t2c, j.t2i, j.t3c, j.t3i, j.tlc, j.tli,
-        j.rebDef, j.rebOf, j.rebTot, j.asistencias, j.recuperos, j.perdidas, j.tapas, j.tapasRecibidas, j.faltas, j.faltasRecibidas, j.valoracion, j.masMenos, archivo.getId(), nota.trim(), p.puntosPropios, p.puntosRival];
+        j.rebDef, j.rebOf, j.rebTot, j.asistencias, j.recuperos, j.perdidas, j.tapas, j.tapasRecibidas, j.faltas, j.faltasRecibidas, j.valoracion, j.masMenos, archivo.getId(), nota.trim(), p.puntosPropios, p.puntosRival, p.categoria];
     });
     est.getRange(est.getLastRow() + 1, 1, filas.length, filas[0].length).setValues(filas);
 
@@ -613,13 +646,10 @@ function procesarPlanillas() {
     p.jugadores.forEach((j) => {
       if (titulos.indexOf(j.jugador) < 0) { titulos.push(j.jugador); hPartidos.getRange(1, titulos.length).setValue(j.jugador).setFontWeight('bold'); }
     });
-    const datos = hPartidos.getDataRange().getValues();
-    let fila = datos.findIndex((f, i) => i > 0 && fecha_(f[0], zona) === fecha && normalizar_(f[1]) === normalizar_(rival)) + 1;
-    if (fila <= 0) {
-      fila = hPartidos.getLastRow() + 1;
-      const [a, m, d] = fecha.split('-').map(Number);
-      hPartidos.getRange(fila, 1, 1, 2).setValues([[new Date(a, m - 1, d), rival]]);
-    }
+    // siempre una fila nueva: dos partidos pueden tener la misma fecha y el mismo rival (por ejemplo, Primera y U21)
+    const fila = hPartidos.getLastRow() + 1;
+    const [a, m, d] = fecha.split('-').map(Number);
+    hPartidos.getRange(fila, 1, 1, 2).setValues([[new Date(a, m - 1, d), `${rival}${p.categoria && p.categoria !== 'Primera' ? ' (' + p.categoria + ')' : ''}`]]);
     p.jugadores.forEach((j) => hPartidos.getRange(fila, titulos.indexOf(j.jugador) + 1).setValue(j.minutos));
     yaCargados[firmaPartido_(p.rival, p.jugadores)] = fecha;
     resumen.push({ archivo: archivo.getName(), fecha, fechaDudosa: !fechaSesion, rival, local: p.local, jugadores: p.jugadores.length, nuevos: jugadoresNuevos, puntosPropios: p.puntosPropios, puntosRival: p.puntosRival });
@@ -700,4 +730,4 @@ function probarLectura() {
   else Logger.log(`Carga: ${d.carga.sesiones.length} sesiones · ${d.carga.partidos.length} minutos de partido · ${d.carga.rpe.length} respuestas de RPE`);
 }
 
-if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_, sesionesFaltantes_, firmaPartido_, leerEstadisticas_ };
+if (typeof module !== 'undefined') module.exports = { columna_, numero_, fecha_, leerSaltos_, leerIft_, leerEncoder_, leerSesiones_, leerPartidos_, leerRpe_, rpe_, parsearPlanilla_, emparejar_, nombreNuevo_, fechaPartido_, sesionesFaltantes_, firmaPartido_, leerEstadisticas_, combinarMinutos_, distancia_ };

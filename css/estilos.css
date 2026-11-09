@@ -99,6 +99,7 @@ button, input, select { font: inherit; color: inherit; }
 .paneles { padding-block: 24px 40px; }
 .panel { display: flex; flex-direction: column; gap: var(--gap); scroll-margin-top: 64px; }
 .ancho { grid-column: 1 / -1; }
+.grilla-arriba { align-items: start; }
 
 /* Tarjetas */
 .tarjeta { position: relative; background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -125,6 +126,7 @@ button, input, select { font: inherit; color: inherit; }
 .fecha-dudosa { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13.5px; color: var(--aviso); }
 .fecha-dudosa input { font-size: 15px; }
 .fecha-dudosa .boton { padding: 4px 12px; font-size: 13px; }
+.barra-partidos { justify-content: flex-start; }
 .marcador { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .marcador .equipos { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; font-family: var(--display); text-transform: uppercase; }
 .marcador .equipo { font-size: 22px; font-weight: 600; }

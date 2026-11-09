@@ -30,7 +30,7 @@
 
   let M = null; // modelo calculado
   let CG = null; // carga calculada
-  let PT = { partidos: [], promedios: [] }; // estadísticas de partido
+  let PT = { est: [], partidos: [], promedios: [] }; // estadísticas de partido
   const estado = {
     pestana: 'resumen',
     jugador: null,
@@ -286,19 +286,29 @@
     $('#partidos-vacio').hidden = hay;
     $('#partidos-contenido').hidden = !hay;
     if (!hay) return;
+
+    // categoría: Primera, U21... (los partidos y los promedios se ven por separado)
+    const cats = [...new Set(PT.partidos.map((p) => p.categoria))].sort((a, b) => (a === 'Primera' ? -1 : b === 'Primera' ? 1 : a.localeCompare(b)));
+    if (!cats.includes(estado.categoria)) estado.categoria = cats[0];
+    const selC = $('#sel-categoria');
+    if (selC.options.length !== cats.length) selC.replaceChildren(...cats.map((c) => new Option(c, c)));
+    selC.value = estado.categoria;
+    $('#control-categoria').hidden = cats.length < 2;
+
+    const lista = PT.partidos.filter((p) => p.categoria === estado.categoria);
     const sel = $('#sel-partido');
-    const ids = PT.partidos.map((p) => p.id);
-    if (sel.options.length !== ids.length) sel.replaceChildren(...PT.partidos.map((p) => new Option(`${fechaCorta(p.fecha)} · ${p.rival}`, p.id)));
+    const ids = lista.map((p) => p.id);
+    sel.replaceChildren(...lista.map((p) => new Option(`${fechaCorta(p.fecha)} · ${p.local ? 'vs' : 'en'} ${p.rival}${p.fechaDudosa ? ' (fecha a confirmar)' : ''}`, p.id)));
     if (!ids.includes(estado.partido)) estado.partido = ids[0];
     sel.value = estado.partido;
-    const p = PT.partidos.find((x) => x.id === estado.partido), t = p.totales;
+    const p = lista.find((x) => x.id === estado.partido), t = p.totales;
 
     const m = $('#marcador'), eq = el('div', 'equipos');
     const propio = el('span', 'equipo', 'Unión'), riv = el('span', 'equipo', p.rival);
-    const tanteador = el('span', 'tanteador', p.puntosRival != null ? `${p.puntosEquipo} – ${p.puntosRival}` : `${p.puntosEquipo}`);
-    if (p.local) eq.append(propio, tanteador, riv); else eq.append(riv, el('span', 'tanteador', p.puntosRival != null ? `${p.puntosRival} – ${p.puntosEquipo}` : `${p.puntosEquipo}`), propio);
+    const marcador = (a, b) => el('span', 'tanteador', b != null ? `${a} – ${b}` : `${a}`);
+    if (p.local) eq.append(propio, marcador(p.puntosEquipo, p.puntosRival), riv); else eq.append(riv, marcador(p.puntosRival != null ? p.puntosRival : p.puntosEquipo, p.puntosRival != null ? p.puntosEquipo : null), propio);
     const info = el('div');
-    info.append(el('p', 'etiqueta', `${p.local ? 'Local' : 'Visitante'} · ${conDia(p.fecha)}`));
+    info.append(el('p', 'etiqueta', `${p.categoria} · ${p.local ? 'Local' : 'Visitante'} · ${conDia(p.fecha)}`));
     if (p.resultado) info.append(el('p', 'numero ' + (p.resultado === 'Ganó' ? 'ok' : p.resultado === 'Perdió' ? 'mal' : 'neutro'), p.resultado));
     if (p.fechaDudosa && p.archivo) {
       const caja = el('div', 'fecha-dudosa'), input = el('input'), b = el('button', 'boton', 'Guardar fecha');
@@ -311,12 +321,11 @@
         try {
           const r = await enviar({ accion: 'fechaPartido', archivo: p.archivo, nueva: input.value });
           if (!r.ok) throw new Error(r.error);
-          estado.partido = `${input.value}|${p.rival}`;
           b.textContent = 'Guardada';
           cargar(true);
         } catch (err) { b.disabled = false; b.textContent = 'Reintentar'; }
       });
-      caja.append('Fecha a confirmar (el PDF no la trae):', input, b);
+      caja.append('Fecha a confirmar (la planilla no la trae):', input, b);
       info.append(caja);
     }
     info.className = 'dato';
@@ -328,51 +337,80 @@
       if (detalle) d.append(el('p', 'detalle', detalle));
       return d;
     };
-    $('#tarjetas-partido').replaceChildren(
+    $('#tarjetas-partido').replaceChildren(...(p.completo ? [
       dato('Tiros de 2', t.p2 != null ? `${t.p2} %` : '—', tiro(t.t2c, t.t2i)),
       dato('Tiros de 3', t.p3 != null ? `${t.p3} %` : '—', tiro(t.t3c, t.t3i)),
       dato('Libres', t.ptl != null ? `${t.ptl} %` : '—', tiro(t.tlc, t.tli)),
       dato('Rebotes', String(t.rebTot), `${t.rebOf} ofensivos`),
       dato('Asistencias', String(t.asistencias), `${t.perdidas} pérdidas`),
       dato('Recuperos', String(t.recuperos), `${t.faltas} faltas`),
-    );
+    ] : [
+      dato('Dobles convertidos', String(t.t2c)),
+      dato('Triples convertidos', String(t.t3c)),
+      dato('Libres', t.ptl != null ? `${t.ptl} %` : '—', tiro(t.tlc, t.tli)),
+      dato('Faltas', String(t.faltas)),
+    ]));
+    $('#nota-partido').textContent = p.completo ? '★ titular. Tiros: convertidos/intentados.'
+      : '★ titular. Esta planilla trae estadísticas básicas: puntos, tiros convertidos, libres y faltas (no trae rebotes, asistencias ni tiros errados).';
 
+    const cols = p.completo
+      ? ['Min', 'Pts', '2P', '3P', 'TL', 'Reb', 'Ast', 'Rec', 'Pér', 'Val', '+/-']
+      : ['Min', 'Pts', 'Dobles', 'Triples', 'TL', 'Faltas', 'Val', '+/-'];
+    const head = el('tr');
+    head.append(el('th', null, 'Jugador'), ...cols.map((c) => el('th', 'num', c)));
+    $('#tabla-partido thead').replaceChildren(head);
     const maxPts = Math.max(...p.jugadores.map((j) => j.puntos));
     $('#tabla-partido tbody').replaceChildren(...p.jugadores.map((j) => {
       const tr = el('tr'), nom = el('td');
       tr.dataset.jugador = j.jugador; tr.tabIndex = 0;
       if (j.titular) nom.append(el('span', 'estrella', '★'));
       nom.append(j.jugador);
+      const n = (v) => el('td', 'num', String(v));
       const pts = el('td', 'num' + (j.puntos === maxPts && maxPts > 0 ? ' ok' : ''), String(j.puntos));
-      const fila = j.minutos > 0
-        ? [el('td', 'num', nf(j.minutos, 0)), pts, el('td', 'num', tiro(j.t2c, j.t2i)), el('td', 'num', tiro(j.t3c, j.t3i)), el('td', 'num', tiro(j.tlc, j.tli)),
-          el('td', 'num', String(j.rebTot)), el('td', 'num', String(j.asistencias)), el('td', 'num', String(j.recuperos)), el('td', 'num', String(j.perdidas)),
-          el('td', 'num', String(j.valoracion)), el('td', 'num ' + tono(j.masMenos), conSigno(j.masMenos))]
-        : [el('td', 'num neutro', 'No jugó'), ...Array.from({ length: 10 }, () => el('td', 'num neutro', ''))];
+      const mm = el('td', 'num ' + tono(j.masMenos), conSigno(j.masMenos));
+      const fila = j.minutos <= 0 ? [el('td', 'num neutro', 'No jugó'), ...Array.from({ length: cols.length - 1 }, () => el('td', 'num neutro', ''))]
+        : p.completo
+          ? [n(nf(j.minutos, 0)), pts, n(tiro(j.t2c, j.t2i)), n(tiro(j.t3c, j.t3i)), n(tiro(j.tlc, j.tli)), n(j.rebTot), n(j.asistencias), n(j.recuperos), n(j.perdidas), n(j.valoracion), mm]
+          : [n(nf(j.minutos, 0)), pts, n(j.t2c), n(j.t3c), n(tiro(j.tlc, j.tli)), n(j.faltas), n(j.valoracion), mm];
       tr.append(nom, ...fila);
       return tr;
     }));
 
-    $('#nota-promedios').textContent = `${PT.partidos.length} ${PT.partidos.length === 1 ? 'partido' : 'partidos'} cargados. Por partido jugado (los partidos sin minutos no cuentan). Los porcentajes son de todo el torneo.`;
-    $('#tabla-promedios tbody').replaceChildren(...PT.promedios.filter((r) => r.jugados).map((r) => {
+    const prom = P.promedios(PT.est, estado.categoria);
+    const algunoCompleto = lista.some((x) => x.completo);
+    $('#titulo-promedios').textContent = `Promedios del torneo · ${estado.categoria}`;
+    $('#nota-promedios').textContent = `${lista.length} ${lista.length === 1 ? 'partido cargado' : 'partidos cargados'}. Por partido jugado (los partidos sin minutos no cuentan).` +
+      (algunoCompleto ? ' Rebotes, asistencias y porcentajes de 2 y 3, solo de las planillas que los traen.' : ' Las planillas de esta categoría no traen rebotes, asistencias ni tiros errados.');
+    const colsP = algunoCompleto ? ['PJ', 'Min', 'Pts', 'Reb', 'Ast', 'Val', '2P %', '3P %', 'TL %'] : ['PJ', 'Min', 'Pts', 'Triples', 'Val', 'TL %'];
+    const headP = el('tr');
+    headP.append(el('th', null, 'Jugador'), ...colsP.map((c) => el('th', 'num', c)));
+    $('#tabla-promedios thead').replaceChildren(headP);
+    $('#tabla-promedios tbody').replaceChildren(...prom.filter((r) => r.jugados).map((r) => {
       const tr = el('tr'); tr.dataset.jugador = r.jugador; tr.tabIndex = 0;
-      const pc = (v) => el('td', 'num' + (v == null ? ' neutro' : ''), v == null ? '—' : String(v));
-      tr.append(el('td', null, r.jugador), el('td', 'num', String(r.jugados)), el('td', 'num', nf(r.minutos, 1)), el('td', 'num', nf(r.puntos, 1)),
-        el('td', 'num', nf(r.rebotes, 1)), el('td', 'num', nf(r.asistencias, 1)), el('td', 'num', nf(r.valoracion, 1)), pc(r.p2), pc(r.p3), pc(r.ptl));
+      const c = (v, d) => el('td', 'num' + (v == null ? ' neutro' : ''), v == null ? '—' : d == null ? String(v) : nf(v, d));
+      tr.append(el('td', null, r.jugador), c(r.jugados), c(r.minutos, 1), c(r.puntos, 1),
+        ...(algunoCompleto ? [c(r.rebotes, 1), c(r.asistencias, 1), c(r.valoracion, 1), c(r.p2), c(r.p3), c(r.ptl)] : [c(r.triples, 1), c(r.valoracion, 1), c(r.ptl)]));
       return tr;
     }));
   }
 
   function partidosJugador(j) {
-    const r = PT.promedios.find((x) => x.jugador === j);
-    $('#hoja-partidos').hidden = !r;
-    if (!r) return;
-    const ult = PT.partidos.map((p) => ({ p, f: p.jugadores.find((x) => x.jugador === j) })).find((x) => x.f);
-    $('#hoja-partidos-nota').textContent = r.jugados
-      ? `${r.jugados} ${r.jugados === 1 ? 'partido jugado' : 'partidos jugados'} de ${r.convocado}. Promedios por partido.` + (ult && ult.f.minutos > 0 ? ` Último: ${ult.f.puntos} puntos en ${nf(ult.f.minutos, 0)} minutos contra ${ult.p.rival}.` : '')
-      : `Convocado a ${r.convocado} ${r.convocado === 1 ? 'partido' : 'partidos'}, todavía sin minutos.`;
+    const filas = PT.est.filter((r) => r.jugador === j);
+    $('#hoja-partidos').hidden = !filas.length;
+    if (!filas.length) return;
+    const cats = [...new Set(filas.map((r) => r.categoria || 'Primera'))];
     const dato = (etiqueta, numero) => { const d = el('article', 'tarjeta dato'); d.append(el('p', 'etiqueta', etiqueta), el('p', 'numero', numero)); return d; };
-    $('#hoja-partidos-datos').replaceChildren(...(r.jugados ? [dato('Minutos', nf(r.minutos, 1)), dato('Puntos', nf(r.puntos, 1)), dato('Rebotes', nf(r.rebotes, 1)), dato('Asistencias', nf(r.asistencias, 1))] : []));
+    const partes = [], tarjetas = [];
+    for (const cat of cats) {
+      const r = P.promedios(PT.est, cat).find((x) => x.jugador === j);
+      if (!r) continue;
+      partes.push(r.jugados ? `${cat}: ${r.jugados} ${r.jugados === 1 ? 'partido jugado' : 'partidos jugados'} de ${r.convocado}.` : `${cat}: convocado a ${r.convocado}, sin minutos.`);
+      if (r.jugados) tarjetas.push(dato(`${cat} · minutos`, nf(r.minutos, 1)), dato(`${cat} · puntos`, nf(r.puntos, 1)));
+    }
+    const ult = PT.partidos.map((p) => ({ p, f: p.jugadores.find((x) => x.jugador === j) })).find((x) => x.f && x.f.minutos > 0);
+    if (ult) partes.push(`Último: ${ult.f.puntos} puntos en ${nf(ult.f.minutos, 0)} minutos ${ult.p.local ? 'contra' : 'en cancha de'} ${ult.p.rival} (${ult.p.categoria}).`);
+    $('#hoja-partidos-nota').textContent = partes.join(' ') + ' Promedios por partido jugado.';
+    $('#hoja-partidos-datos').replaceChildren(...tarjetas);
   }
 
   // ---------- Hoja del jugador ----------
@@ -480,6 +518,7 @@
     $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
   }
   $('#sel-partido').addEventListener('change', (e) => { estado.partido = e.target.value; dibujar(); });
+  $('#sel-categoria').addEventListener('change', (e) => { estado.categoria = e.target.value; estado.partido = null; dibujar(); });
   $('#tabla-carga tbody').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrirJugador(e.target.closest('tr[data-jugador]')); });
   $('#btn-copiar').addEventListener('click', () => {
     const i = $('#link-form');
@@ -521,7 +560,7 @@
     const hoy = demo && datos.carga ? K.ultimaFecha(datos.carga) : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
     CG = K.preparar(datos.carga, hoy || new Date().toISOString().slice(0, 10));
     const est = (datos.carga && datos.carga.estadisticas) || [];
-    PT = { partidos: P.partidos(est), promedios: P.promedios(est) };
+    PT = { est, partidos: P.partidos(est), promedios: P.promedios(est) };
     $('#cargando').hidden = true;
     $('#acceso').hidden = true;
     $('#app').hidden = false;

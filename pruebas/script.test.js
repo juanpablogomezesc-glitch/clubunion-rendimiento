@@ -201,3 +201,26 @@ test('Estadísticas → filas para la página (saltea las marcas sin jugador)', 
 test('fechas en formato AAAA-MM-DD (como las escribe el script)', () => {
   assert.equal(S.fecha_('2026-10-26'), '2026-10-26');
 });
+
+test('categoría del partido según el torneo', () => {
+  assert.equal(S.parsearPlanilla_(planilla, 'UNION DE SANTO TOME').categoria, 'Primera');
+  const u21 = planilla.replace('MM ASB MAYORES MASCULINO', 'U21M ASB PRÓXIMO MASCULINO');
+  assert.equal(S.parsearPlanilla_(u21, 'UNION DE SANTO TOME').categoria, 'U21');
+});
+
+test('nombres: un apellido con una letra distinta empareja si el nombre coincide', () => {
+  const plantel = ['Juan Sebastián Varoni', 'Lucas Nanzer', 'Tomas Leoni'];
+  assert.equal(S.emparejar_('BARONI, JUAN SEBASTIAN', plantel, {}), 'Juan Sebastián Varoni');
+  assert.equal(S.emparejar_('BARONI, PEDRO', plantel, {}), null); // otro nombre: no
+  assert.equal(S.emparejar_('LEON, TOMAS', plantel, {}), null);   // apellido corto: no se arriesga
+});
+
+test('minutos para la carga: de las planillas, y de Partidos solo lo cargado a mano', () => {
+  const est = [{ fecha: '2026-10-27', rival: 'Sanjustino', jugador: 'Ana', minutos: 20, categoria: 'U21' }];
+  const planilla = [
+    { fecha: '2026-10-27', rival: 'Sanjustino (U21)', jugador: 'Ana', minutos: 20 }, // la misma: no se repite
+    { fecha: '2026-10-20', rival: 'Amistoso', jugador: 'Ana', minutos: 15 },          // cargada a mano: entra
+  ];
+  const r = S.combinarMinutos_(planilla, est);
+  assert.deepEqual(r.map((x) => [x.fecha, x.minutos]), [['2026-10-27', 20], ['2026-10-20', 15]]);
+});
