@@ -112,3 +112,20 @@ test('los partidos cuentan aunque el jugador no responda el formulario', () => {
   assert.equal(prep.minutosPartido.filas[0].jugador, 'Ana');
   assert.equal(prep.minutosPartido.partidos[0].categoria, 'U21');
 });
+
+test('carga semanal separada por tipo de sesión, que suma el total', () => {
+  const c = {
+    sesiones: [{ fecha: '2026-11-03', tipo: 'Entrenamiento', duracion: 90 }],
+    partidos: [{ fecha: '2026-11-04', rival: 'X', jugador: 'Ana', minutos: 30 }],
+    rpe: [{ fecha: '2026-11-03', jugador: 'Ana', tipo: 'Entrenamiento', rpe: 5 }, { fecha: '2026-11-03', jugador: 'Beto', tipo: 'Entrenamiento', rpe: 3 }],
+    plantel: ['Ana', 'Beto'],
+  };
+  const p = K.preparar(c, '2026-11-09');
+  const s = p.equipoSemanal.find((x) => x.semana === '2026-11-02');
+  // Ana: 450 + 210 (partido estimado con RPE 7); Beto: 270 → promedio 465
+  assert.equal(s.carga, 465);
+  assert.deepEqual(s.partes, { Entrenamiento: 360, Partido: 105 });
+  assert.equal(p.equipoSemanal.length, 4, 'arranca en la primera semana con datos, mínimo 4 barras');
+  assert.equal(p.equipoDiario.length, 14);
+  assert.equal(p.equipoDiario.find((d) => d.semana === '2026-11-04').carga, 210);
+});

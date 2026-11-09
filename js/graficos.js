@@ -170,30 +170,63 @@
   }
 
   /** Barras por semana. filas: [{ semana: 'AAAA-MM-DD' (lunes), carga }] */
+  // Colores por tipo de sesión (los mismos en todos los gráficos de carga)
+  const TIPOS = [['Partido', 'var(--rojo)'], ['Entrenamiento', '#7aa7ff'], ['Gimnasio', '#f5b841'], ['Otro', '#9ca3af']];
+  const colorTipo = (t) => (TIPOS.find(([n]) => n === t) || TIPOS[3])[1];
+
+  /** Barras apiladas por tipo de sesión. filas: [{ semana (o día), carga, partes: { Partido: UA, ... }, jugadores }] */
   function semanas(box, filas, o) {
     if (!filas.some((r) => r.carga)) return vacio(box, o.vacio || 'Sin carga registrada en estas semanas.');
-    const h = 220, m = { t: 22, r: 8, b: 30, l: 44 };
+    const h = 230, m = { t: 22, r: 8, b: o.dias ? 40 : 30, l: 44 };
     const c = lienzo(box, h);
     if (!c) return;
     const { svg, w } = c;
-    const x = d3.scaleBand(filas.map((r) => r.semana), [m.l, w - m.r]).padding(0.3);
+    const x = d3.scaleBand(filas.map((r) => r.semana), [m.l, w - m.r]).padding(o.dias ? 0.25 : 0.3);
     const y = d3.scaleLinear([0, d3.max(filas, (r) => r.carga || 0) * 1.15], [h - m.b, m.t]);
     for (const t of y.ticks(4)) {
       svg.append('line').attr('x1', m.l).attr('x2', w - m.r).attr('y1', y(t)).attr('y2', y(t)).attr('stroke', 'var(--grid)');
       svg.append('text').attr('x', m.l - 6).attr('y', y(t) + 4).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--texto-2)').text(nf(t, 0));
     }
     const fecha = (s) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+    const DIA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
     const ultima = filas[filas.length - 1].semana;
-    filas.forEach((r) => {
-      svg.append('text').attr('x', x(r.semana) + x.bandwidth() / 2).attr('y', h - m.b + 17).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--texto-2)').text(fecha(r.semana));
+    const angosto = x.bandwidth() < 30;
+    filas.forEach((r, i) => {
+      const cx = x(r.semana) + x.bandwidth() / 2;
+      if (!angosto || i % 2 === filas.length % 2 || r.semana === ultima)
+        svg.append('text').attr('x', cx).attr('y', h - m.b + 17).attr('text-anchor', 'middle').attr('font-size', 11)
+          .attr('fill', r.semana === ultima ? 'var(--texto)' : 'var(--texto-2)').text(fecha(r.semana));
+      if (o.dias) svg.append('text').attr('x', cx).attr('y', h - m.b + 31).attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', 'var(--texto-2)')
+        .text(DIA[new Date(r.semana + 'T12:00:00Z').getUTCDay()]);
       if (!r.carga) return;
-      const bw = Math.min(40, x.bandwidth()), bx = x(r.semana) + (x.bandwidth() - bw) / 2;
-      conTip(svg.append('rect').datum(r).attr('x', bx).attr('width', bw).attr('y', y(r.carga)).attr('height', y(0) - y(r.carga)).attr('rx', 4)
-        .attr('fill', r.semana === ultima ? 'var(--rojo)' : '#6b7280'),
-        () => `Semana del ${fecha(r.semana)}`, () => `${nf(r.carga, 0)} UA${r.jugadores ? ` · ${r.jugadores} jugadores` : ''}`);
-      if (bw >= 26) svg.append('text').attr('x', bx + bw / 2).attr('y', y(r.carga) - 6).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--texto)').text(nf(r.carga, 0));
+      const bw = Math.min(o.dias ? 30 : 44, x.bandwidth()), bx = x(r.semana) + (x.bandwidth() - bw) / 2;
+      const partes = r.partes && Object.keys(r.partes).length ? r.partes : { Otro: r.carga };
+      const titulo = () => (o.dias ? new Date(r.semana + 'T12:00:00Z').toLocaleDateString('es-AR', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'UTC' }) : `Semana del ${fecha(r.semana)}`);
+      const detalle = () => [`${nf(r.carga, 0)} UA${r.jugadores ? ` · ${r.jugadores} jugadores` : ''}`,
+        ...TIPOS.filter(([t]) => partes[t]).map(([t]) => `${t}: ${nf(partes[t], 0)} UA`)].join(' · ') + (r.estimada ? ' · incluye partidos estimados' : '');
+      let base = 0;
+      for (const [t] of TIPOS) {
+        const v = partes[t];
+        if (!v) continue;
+        conTip(svg.append('rect').attr('x', bx).attr('width', bw).attr('y', y(base + v)).attr('height', Math.max(1, y(base) - y(base + v)))
+          .attr('fill', colorTipo(t)).attr('opacity', r.semana === ultima || o.dias ? 1 : 0.85), titulo, detalle);
+        base += v;
+      }
+      if (r.semana === ultima && !o.dias) svg.append('rect').attr('x', bx - 3).attr('width', bw + 6).attr('y', y(r.carga) - 3).attr('height', y(0) - y(r.carga) + 3)
+        .attr('rx', 5).attr('fill', 'none').attr('stroke', 'var(--texto)').attr('stroke-width', 1.5).attr('pointer-events', 'none');
+      if (bw >= 26) svg.append('text').attr('x', bx + bw / 2).attr('y', y(r.carga) - 7).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--texto)').text(nf(r.carga, 0));
     });
   }
 
-  window.Graficos = { porJugador, asimetria, perfil, saltos, semanas, nf };
+  /** Leyenda de colores por tipo de sesión, solo con los tipos que aparecen. */
+  function leyendaTipos(caja, filas) {
+    if (!caja) return;
+    const hay = new Set(filas.flatMap((r) => Object.keys(r.partes || {})));
+    caja.replaceChildren(...TIPOS.filter(([t]) => hay.has(t)).map(([t, col]) => {
+      const s = document.createElement('span'), i = document.createElement('i');
+      i.style.background = col; s.append(i, t); return s;
+    }));
+  }
+
+  window.Graficos = { porJugador, asimetria, perfil, saltos, semanas, leyendaTipos, nf };
 })();

@@ -150,7 +150,7 @@
     $('#carga-vacio').hidden = !CG.vacio || !!CG.error;
     $('#carga-form').hidden = !CG.formulario;
     $('#link-form').value = CG.formulario || '';
-    for (const id of ['#tarjetas-carga', '#carga-equipo-tarjeta', '#carga-jugadores-tarjeta']) $(id).hidden = CG.vacio;
+    for (const id of ['#tarjetas-carga', '#carga-equipo-tarjeta', '#carga-dias-tarjeta', '#carga-jugadores-tarjeta']) $(id).hidden = CG.vacio;
     if (CG.error) return;
     sesionesYNovedades();
     if (CG.vacio) return;
@@ -174,8 +174,11 @@
       tarjeta('Último partido', u ? u.rival || fechaCorta(u.fecha) : '—', null, u ? `${fechaCorta(u.fecha)} · jugaron ${u.jugaron}` : 'Todavía no hay partidos cargados'),
     );
     G.semanas($('#g-carga-equipo'), CG.equipoSemanal, {});
-    $('#nota-carga-equipo').textContent = 'Promedio por jugador de RPE × minutos (UA), de lunes a domingo. Últimas 8 semanas; la barra roja es la semana en curso.' +
-      (CG.estimadas ? ` Los partidos cuentan aunque el jugador no haya completado el formulario: en ese caso se usan sus minutos jugados × RPE ${nf(CG.rpeEstimado, 1)} (el promedio de los partidos respondidos, o 7 si todavía no hay).` : '');
+    G.leyendaTipos($('#ley-carga-equipo'), CG.equipoSemanal);
+    G.semanas($('#g-carga-dias'), CG.equipoDiario, { dias: true, vacio: 'Sin carga en las últimas 2 semanas.' });
+    G.leyendaTipos($('#ley-carga-dias'), CG.equipoDiario);
+    $('#nota-carga-equipo').textContent = 'Promedio por jugador de RPE × minutos (UA), de lunes a domingo, Primera y U21 juntas, separado por tipo de sesión. La barra recuadrada es la semana en curso. Tocá una barra para ver el detalle.' +
+      (CG.estimadas ? ` Si un jugador no completó el formulario de un partido, se usan sus minutos × RPE ${nf(CG.rpeEstimado, 1)}.` : '');
     minutosPartido();
 
     const conDatos = CG.jugadores.filter((j) => j.aguda != null || j.cronica != null || j.minutosTotal || j.ultimoPartido);
@@ -302,7 +305,8 @@
     if (d.aguda != null) partes.push(`Últimos 7 días: ${nf(d.aguda, 0)} UA${d.relacion != null ? ` (${nf(d.relacion, 2)} veces tu promedio semanal)` : ''}.`);
     if (d.partidosJugados) partes.push(`Minutos en partidos: ${nf(d.minutosTotal, 0)} en ${d.partidosJugados} ${d.partidosJugados === 1 ? 'partido' : 'partidos'} (promedio ${nf(d.minutosPromedio, 1)}).`);
     $('#hoja-carga-nota').textContent = partes.join(' ') || 'RPE × minutos de cada semana, de lunes a domingo.';
-    G.semanas($('#g-carga-j'), d.semanal, { vacio: 'Todavía no respondiste el formulario en estas semanas.' });
+    G.semanas($('#g-carga-j'), d.semanal, { vacio: 'Sin carga en estas semanas.' });
+    G.leyendaTipos($('#ley-carga-j'), d.semanal);
   }
 
   // ---------- Partidos ----------

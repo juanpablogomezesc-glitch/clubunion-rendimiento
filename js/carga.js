@@ -81,12 +81,23 @@
 
     // Semanas del gráfico: las últimas N hasta la de hoy
     const semanaHoy = lunes(hoy);
-    const semanas = Array.from({ length: semanasGrafico }, (_, i) => sumarDias(semanaHoy, -7 * (semanasGrafico - 1 - i)));
-    const equipoSemanal = semanas.map((s) => {
-      const rs = regs.filter((r) => r.semana === s && r.carga != null);
-      const porJugador = [...new Set(rs.map((r) => r.jugador))].map((j) => rs.filter((r) => r.jugador === j).reduce((t, r) => t + r.carga, 0));
-      return { semana: s, carga: redondear(media(porJugador)), jugadores: porJugador.length, sesiones: sesiones.filter((x) => lunes(x.fecha) === s).length };
-    });
+    let semanas = Array.from({ length: semanasGrafico }, (_, i) => sumarDias(semanaHoy, -7 * (semanasGrafico - 1 - i)));
+    // si los datos empiezan hace menos de N semanas, el gráfico arranca en la primera semana con datos (mínimo 4 barras)
+    const primera = regs.length ? lunes(regs[0].fecha) : semanaHoy;
+    const desde = semanas.findIndex((s) => s >= primera);
+    if (desde > 0) semanas = semanas.slice(Math.min(desde, semanas.length - 4));
+    // promedio por jugador, separado por tipo de sesión (las partes suman la carga total)
+    const promedioPorTipo = (rs) => {
+      rs = rs.filter((r) => r.carga != null);
+      const js = new Set(rs.map((r) => r.jugador)).size;
+      const partes = {};
+      for (const r of rs) partes[r.tipo] = (partes[r.tipo] || 0) + r.carga;
+      for (const k of Object.keys(partes)) partes[k] = redondear(partes[k] / js);
+      return { carga: js ? redondear(rs.reduce((t, r) => t + r.carga, 0) / js) : null, jugadores: js, partes, estimada: rs.some((r) => r.estimada) };
+    };
+    const equipoSemanal = semanas.map((s) => ({ semana: s, ...promedioPorTipo(regs.filter((r) => r.semana === s)), sesiones: sesiones.filter((x) => lunes(x.fecha) === s).length }));
+    const dias = Array.from({ length: 14 }, (_, i) => sumarDias(hoy, i - 13));
+    const equipoDiario = dias.map((d) => ({ semana: d, dia: true, ...promedioPorTipo(regs.filter((r) => r.fecha === d)) }));
 
     // Ventanas móviles: últimos 7 días (aguda) y las 4 semanas anteriores (crónica, promedio semanal)
     const desde7 = sumarDias(hoy, -6), desde7prev = sumarDias(hoy, -13), hasta7prev = sumarDias(hoy, -7);
@@ -118,7 +129,7 @@
         partidosJugados: jugados.length,
         minutosPromedio: redondear(media(jugados.map((p) => p.minutos)), 1),
         ultimoPartido: pts.length ? pts[pts.length - 1] : null,
-        semanal: semanas.map((s) => ({ semana: s, carga: redondear(mios.filter((r) => r.semana === s).reduce((t, r) => t + (r.carga || 0), 0)) || null })),
+        semanal: semanas.map((s) => ({ semana: s, ...promedioPorTipo(mios.filter((r) => r.semana === s)) })),
       };
     });
 
@@ -154,6 +165,7 @@
       formulario: c.formulario || '',
       registros: regs,
       equipoSemanal,
+      equipoDiario,
       jugadores,
       carga7: redondear(carga7),
       cambio7: carga7 != null && cargaPrev ? redondear(((carga7 - cargaPrev) / cargaPrev) * 100, 1) : null,
