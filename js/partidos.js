@@ -37,6 +37,8 @@
         puntosEquipo: propios,
         puntosRival: rival,
         resultado: rival == null ? null : propios > rival ? 'Ganó' : propios < rival ? 'Perdió' : 'Empató',
+        fechaDudosa: rs.some((r) => r.fechaDudosa),
+        archivo: (rs.find((r) => r.archivo) || {}).archivo || '',
         totales: { ...t, p2: pct(t.t2c, t.t2i), p3: pct(t.t3c, t.t3i), ptl: pct(t.tlc, t.tli) },
         jugadores: [...rs].sort((a, b) => b.minutos - a.minutos || b.puntos - a.puntos),
       };

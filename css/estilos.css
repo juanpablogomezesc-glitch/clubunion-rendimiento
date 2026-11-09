@@ -120,6 +120,11 @@ button, input, select { font: inherit; color: inherit; }
 .mal { color: var(--mal) !important; }
 .neutro { color: var(--texto-2) !important; }
 .aviso { color: var(--aviso) !important; }
+.aviso-script { margin: 0; padding: 12px 14px; border: 1px solid var(--rojo); background: var(--rojo-suave); border-radius: 8px; font-size: 14.5px; max-width: 75ch; }
+.aviso-script a { color: #fff; }
+.fecha-dudosa { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13.5px; color: var(--aviso); }
+.fecha-dudosa input { font-size: 15px; }
+.fecha-dudosa .boton { padding: 4px 12px; font-size: 13px; }
 .marcador { flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .marcador .equipos { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; font-family: var(--display); text-transform: uppercase; }
 .marcador .equipo { font-size: 22px; font-weight: 600; }

@@ -31,3 +31,8 @@ test('sin estadísticas no se rompe', () => {
   assert.deepEqual(P.partidos([]), []);
   assert.deepEqual(P.promedios(undefined), []);
 });
+
+test('un partido con la fecha a confirmar lo indica, con su archivo', () => {
+  const p = P.partidos([fila({ jugador: 'Ana', minutos: 10, fechaDudosa: true, archivo: 'abc' })])[0];
+  assert.deepEqual([p.fechaDudosa, p.archivo], [true, 'abc']);
+});

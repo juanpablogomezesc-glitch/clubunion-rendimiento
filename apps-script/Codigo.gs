@@ -12,6 +12,7 @@
 const PAGINA = 'https://juanpablogomezesc-glitch.github.io/clubunion-rendimiento/'; // dónde está la página
 const SEGUNDOS_EN_MEMORIA = 300;            // una consulta repetida en 5 minutos no vuelve a leer la planilla
 const SEGUNDOS_MINIMOS_ENTRE_LECTURAS = 30; // el botón "Actualizar" no lee la planilla más de una vez cada 30 segundos
+const VERSION = '2026-11-09'; // la página avisa si la implementación publicada es más vieja que esta
 const ID_CARGA = '1I0zUBZIcicYVUmd854eoCoBwNfNuO-43VO1zoi0cPyQ'; // planilla "CARGA PRIMERA" (sesiones, partidos y RPE)
 const CARPETA_PDF = '1WmIe9vu4_c6YkQMtrkreMwSKis__Nq1K';  // carpeta "Planillas de partido (PDF)"
 const EQUIPO = 'UNION DE SANTO TOME';                       // cómo figura el club en la planilla de la CABB
@@ -256,7 +257,7 @@ function leerEstadisticas_(filas, zona) {
   const c = { f: col('Fecha'), r: col('Rival'), co: col('Condición'), j: col('Jugador'), ti: col('Titular'), m: col('Minutos'), pts: col('Puntos'),
     t2c: col('2P conv'), t2i: col('2P int'), t3c: col('3P conv'), t3i: col('3P int'), tlc: col('TL conv'), tli: col('TL int'),
     rd: col('Reb def'), ro: col('Reb of'), rt: col('Reb tot'), as: col('Asistencias'), rec: col('Recuperos'), per: col('Pérdidas'),
-    tap: col('Tapas'), fal: col('Faltas'), val: col('Valoración'), mm: col('+/-'), pe: col('Puntos equipo'), pr: col('Puntos rival') };
+    tap: col('Tapas'), fal: col('Faltas'), val: col('Valoración'), mm: col('+/-'), pe: col('Puntos equipo'), pr: col('Puntos rival'), no: col('Nota'), ar: col('Archivo') };
   if (c.f < 0 || c.j < 0 || c.m < 0) return [];
   const n = (f, i) => (i >= 0 ? numero_(f[i]) : null);
   const out = [];
@@ -267,7 +268,8 @@ function leerEstadisticas_(filas, zona) {
       minutos: n(f, c.m) || 0, puntos: n(f, c.pts) || 0, t2c: n(f, c.t2c) || 0, t2i: n(f, c.t2i) || 0, t3c: n(f, c.t3c) || 0, t3i: n(f, c.t3i) || 0,
       tlc: n(f, c.tlc) || 0, tli: n(f, c.tli) || 0, rebDef: n(f, c.rd) || 0, rebOf: n(f, c.ro) || 0, rebTot: n(f, c.rt) || 0,
       asistencias: n(f, c.as) || 0, recuperos: n(f, c.rec) || 0, perdidas: n(f, c.per) || 0, tapas: n(f, c.tap) || 0, faltas: n(f, c.fal) || 0,
-      valoracion: n(f, c.val) || 0, masMenos: n(f, c.mm) || 0, puntosEquipo: n(f, c.pe), puntosRival: n(f, c.pr) });
+      valoracion: n(f, c.val) || 0, masMenos: n(f, c.mm) || 0, puntosEquipo: n(f, c.pe), puntosRival: n(f, c.pr),
+      fechaDudosa: c.no >= 0 && /revis[aá] la fecha/i.test(String(f[c.no])), archivo: c.ar >= 0 ? String(f[c.ar]) : '' });
   }
   return out;
 }
@@ -363,7 +365,7 @@ function doGet(e) {
     const reciente = cache.get('lectura-reciente');
     if (guardado && (!p.fresco || reciente)) return ContentService.createTextOutput(guardado).setMimeType(ContentService.MimeType.JSON);
 
-    const texto = JSON.stringify({ ok: true, generado: new Date().toISOString(), datos: leerTodo_() });
+    const texto = JSON.stringify({ ok: true, version: VERSION, generado: new Date().toISOString(), datos: leerTodo_() });
     if (texto.length < 100000) cache.put('evaluaciones', texto, SEGUNDOS_EN_MEMORIA);
     cache.put('lectura-reciente', '1', SEGUNDOS_MINIMOS_ENTRE_LECTURAS);
     return ContentService.createTextOutput(texto).setMimeType(ContentService.MimeType.JSON);
@@ -392,6 +394,10 @@ function doPost(e) {
         carpeta.createFile(Utilities.newBlob(bytes, MimeType.PDF, nombre));
         return responder_({ ok: true, resultado: procesarPlanillas() });
       }
+      if (p.accion === 'fechaPartido') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(p.nueva))) return responder_({ ok: false, error: 'Fecha inválida.' });
+        return responder_(cambiarFechaPartido_(String(p.archivo || ''), String(p.nueva)));
+      }
       if (p.accion === 'duracion') {
         const duracion = Number(p.duracion);
         if (!(duracion > 0 && duracion <= 300)) return responder_({ ok: false, error: 'La duración tiene que estar entre 1 y 300 minutos.' });
@@ -410,6 +416,27 @@ function doPost(e) {
   } catch (err) {
     return responder_({ ok: false, error: String(err && err.message || err) });
   }
+}
+
+/** Cambia la fecha de un partido (todas sus filas de Estadísticas y su fila de Partidos) y saca la nota de "revisá la fecha". */
+function cambiarFechaPartido_(archivo, nueva) {
+  const ss = SpreadsheetApp.openById(ID_CARGA), zona = ss.getSpreadsheetTimeZone();
+  const est = ss.getSheetByName('Estadísticas'), filas = est.getDataRange().getValues();
+  const t = filas[0], cA = t.indexOf('Archivo'), cN = t.indexOf('Nota');
+  let vieja = null, rival = null, cambiadas = 0;
+  filas.forEach((f, i) => {
+    if (i === 0 || String(f[cA]) !== archivo || !nombre_(f[3])) return;
+    vieja = vieja || fecha_(f[0], zona); rival = rival || nombre_(f[1]);
+    est.getRange(i + 1, 1).setValue(nueva);
+    est.getRange(i + 1, cN + 1).setValue(String(f[cN]).replace(/Revis[aá] la fecha:[^.]*;[^.]*\.\s*/i, '').trim());
+    cambiadas++;
+  });
+  if (!cambiadas) return { ok: false, error: 'No se encontró ese partido.' };
+  const hP = ss.getSheetByName('Partidos'), dP = hP.getDataRange().getValues();
+  const i = dP.findIndex((f, k) => k > 0 && fecha_(f[0], zona) === vieja && normalizar_(f[1]) === normalizar_(rival));
+  const [a, m, d] = nueva.split('-').map(Number);
+  if (i > 0) hP.getRange(i + 1, 1).setValue(new Date(a, m - 1, d));
+  return { ok: true, cambiadas };
 }
 
 // ---------- Para ejecutar a mano desde el editor ----------

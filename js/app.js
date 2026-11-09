@@ -300,6 +300,25 @@
     const info = el('div');
     info.append(el('p', 'etiqueta', `${p.local ? 'Local' : 'Visitante'} · ${conDia(p.fecha)}`));
     if (p.resultado) info.append(el('p', 'numero ' + (p.resultado === 'Ganó' ? 'ok' : p.resultado === 'Perdió' ? 'mal' : 'neutro'), p.resultado));
+    if (p.fechaDudosa && p.archivo) {
+      const caja = el('div', 'fecha-dudosa'), input = el('input'), b = el('button', 'boton', 'Guardar fecha');
+      input.type = 'date'; input.value = p.fecha; input.setAttribute('aria-label', 'Fecha del partido');
+      b.type = 'button';
+      b.addEventListener('click', async () => {
+        if (demo) { b.textContent = 'Ejemplo'; return; }
+        if (!input.value) return;
+        b.disabled = true; b.textContent = 'Guardando…';
+        try {
+          const r = await enviar({ accion: 'fechaPartido', archivo: p.archivo, nueva: input.value });
+          if (!r.ok) throw new Error(r.error);
+          estado.partido = `${input.value}|${p.rival}`;
+          b.textContent = 'Guardada';
+          cargar(true);
+        } catch (err) { b.disabled = false; b.textContent = 'Reintentar'; }
+      });
+      caja.append('Fecha a confirmar (el PDF no la trae):', input, b);
+      info.append(caja);
+    }
     info.className = 'dato';
     m.replaceChildren(eq, info);
 
@@ -561,6 +580,7 @@
         if (j.error === 'clave') { guardar('union-clave', null); guardar(llave, null); clave = null; M = null; return pedirClave('Esa clave no es válida.'); }
         throw new Error(j.error || 'respuesta inválida');
       }
+      $('#aviso-script').hidden = !!j.version && j.version >= (window.CONFIG.VERSION_SCRIPT || '');
       guardar(llave, JSON.stringify({ clave, datos: j.datos, generado: j.generado }));
       iniciar(j.datos, j.generado);
     } catch (e) {
