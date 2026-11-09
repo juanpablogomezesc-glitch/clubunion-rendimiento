@@ -31,11 +31,18 @@
   const redondear = (v, d = 0) => (v == null ? null : Math.round(v * 10 ** d) / 10 ** d);
   const entre = (f, desde, hasta) => f >= desde && f <= hasta;
 
-  /** Cada respuesta de RPE con sus minutos y su carga. Si un jugador respondió dos veces la misma sesión, vale la última. */
+  /** RPE que se usa para un partido cuando el jugador no respondió el formulario (si nadie respondió nunca un partido). */
+  const RPE_PARTIDO = 7;
+
+  /**
+   * Cada respuesta de RPE con sus minutos y su carga. Si un jugador respondió dos veces la misma sesión, vale la última.
+   * Los partidos cuentan siempre: si el jugador jugó y no respondió, la carga se estima con sus minutos y el RPE
+   * medio de los partidos que sí se respondieron (o RPE_PARTIDO si todavía no hay ninguno). Esas filas llevan estimada: true.
+   */
   function registros(c) {
     const unicas = new Map();
     for (const r of c.rpe || []) unicas.set(`${r.jugador}|${r.fecha}|${r.tipo}`, r);
-    return [...unicas.values()].map((r) => {
+    const reales = [...unicas.values()].map((r) => {
       let minutos = null;
       if (r.tipo === 'Partido') {
         const p = (c.partidos || []).find((x) => x.jugador === r.jugador && x.fecha === r.fecha);
@@ -45,8 +52,14 @@
         const s = (c.sesiones || []).find((x) => x.fecha === r.fecha && x.tipo === r.tipo) || (c.sesiones || []).find((x) => x.fecha === r.fecha);
         if (s) minutos = s.duracion;
       }
-      return { jugador: r.jugador, fecha: r.fecha, semana: lunes(r.fecha), tipo: r.tipo, rpe: r.rpe, minutos, carga: minutos == null ? null : r.rpe * minutos };
-    }).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+      return { jugador: r.jugador, fecha: r.fecha, semana: lunes(r.fecha), tipo: r.tipo, rpe: r.rpe, minutos, carga: minutos == null ? null : r.rpe * minutos, estimada: false };
+    });
+    const rpePartidos = reales.filter((r) => r.tipo === 'Partido').map((r) => r.rpe);
+    const rpeEstimado = rpePartidos.length ? redondear(media(rpePartidos), 1) : RPE_PARTIDO;
+    const respondidos = new Set(reales.filter((r) => r.tipo === 'Partido').map((r) => `${r.jugador}|${r.fecha}`));
+    const estimadas = (c.partidos || []).filter((p) => p.minutos > 0 && !respondidos.has(`${p.jugador}|${p.fecha}`))
+      .map((p) => ({ jugador: p.jugador, fecha: p.fecha, semana: lunes(p.fecha), tipo: 'Partido', rpe: rpeEstimado, minutos: p.minutos, carga: rpeEstimado * p.minutos, estimada: true }));
+    return [...reales, ...estimadas].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
   }
 
   function estadoRelacion(v) {
@@ -62,6 +75,7 @@
     if (!c) return { vacio: true, error: null };
     if (c.error) return { vacio: true, error: c.error };
     const regs = registros(c);
+    const respuestas = regs.filter((r) => !r.estimada);
     const sesiones = c.sesiones || [], partidos = c.partidos || [];
     const vacio = !regs.length && !sesiones.length && !partidos.length;
 
@@ -97,8 +111,9 @@
         cronica: redondear(cronica),
         relacion,
         estado: estadoRelacion(relacion),
-        rpe7: redondear(media(ult7.map((r) => r.rpe)), 1),
-        respuestas7: ult7.length,
+        rpe7: redondear(media(ult7.filter((r) => !r.estimada).map((r) => r.rpe)), 1),
+        respuestas7: ult7.filter((r) => !r.estimada).length,
+        estimada7: ult7.some((r) => r.estimada),
         minutosTotal: pts.reduce((t, p) => t + p.minutos, 0),
         partidosJugados: jugados.length,
         minutosPromedio: redondear(media(jugados.map((p) => p.minutos)), 1),
@@ -118,7 +133,7 @@
     // Cumplimiento del formulario en las sesiones de los últimos 14 días
     const activos = (c.plantel || []).length || nombres.length;
     const ses14 = sesiones.filter((s) => entre(s.fecha, sumarDias(hoy, -13), hoy));
-    const respondidas = ses14.reduce((t, s) => t + regs.filter((r) => r.fecha === s.fecha && r.tipo === s.tipo).length, 0);
+    const respondidas = ses14.reduce((t, s) => t + respuestas.filter((r) => r.fecha === s.fecha && r.tipo === s.tipo).length, 0);
     const cumplimiento = ses14.length && activos ? Math.min(100, Math.round((100 * respondidas) / (ses14.length * activos))) : null;
 
     const fechasPartido = [...new Set(partidos.map((p) => p.fecha))].sort();
@@ -127,7 +142,7 @@
 
     // Sesiones de las últimas 2 semanas, con cuántos respondieron (la duración se puede corregir desde la página)
     const sesionesRecientes = sesiones.filter((s) => entre(s.fecha, sumarDias(hoy, -13), hoy))
-      .map((s) => ({ ...s, respuestas: regs.filter((r) => r.fecha === s.fecha && r.tipo === s.tipo).length }))
+      .map((s) => ({ ...s, respuestas: respuestas.filter((r) => r.fecha === s.fecha && r.tipo === s.tipo).length }))
       .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
 
     return {
@@ -146,7 +161,21 @@
       cumplimiento,
       ultimoPartido,
       sinMinutos: regs.filter((r) => r.carga == null).length,
+      estimadas: regs.filter((r) => r.estimada).length,
+      rpeEstimado: (regs.find((r) => r.estimada) || {}).rpe || null,
+      minutosPartido: minutosPartido(partidos, jugadores.map((j) => j.jugador)),
     };
+  }
+
+  /** Tabla jugador × partido con los minutos jugados (los últimos 8 partidos), para ver la carga de partidos sin el formulario. */
+  function minutosPartido(partidos, nombres, cuantos = 8) {
+    const claves = [...new Map(partidos.map((p) => [`${p.fecha}|${p.rival}`, { fecha: p.fecha, rival: p.rival, categoria: p.categoria || (/\(U\d{2}\)/.test(p.rival) ? 'U21' : 'Primera') }])).entries()]
+      .sort((a, b) => (a[1].fecha < b[1].fecha ? -1 : a[1].fecha > b[1].fecha ? 1 : 0)).slice(-cuantos);
+    const filas = nombres.map((j) => {
+      const mins = claves.map(([k]) => { const p = partidos.find((x) => x.jugador === j && `${x.fecha}|${x.rival}` === k); return p ? p.minutos : null; });
+      return { jugador: j, minutos: mins, total: redondear(mins.reduce((t, m) => t + (m || 0), 0)) };
+    }).filter((f) => f.minutos.some((m) => m != null)).sort((a, b) => b.total - a.total);
+    return { partidos: claves.map(([, v]) => v), filas };
   }
 
   /** El día más reciente con datos (para la vista de ejemplo). */
@@ -155,5 +184,5 @@
     return fs[fs.length - 1] || null;
   }
 
-  return { RELACION, lunes, sumarDias, registros, estadoRelacion, preparar, ultimaFecha };
+  return { RELACION, RPE_PARTIDO, minutosPartido, lunes, sumarDias, registros, estadoRelacion, preparar, ultimaFecha };
 });

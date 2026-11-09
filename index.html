@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=10">
+  <link rel="stylesheet" href="css/estilos.css?v=11">
 </head>
 <body>
   <div class="franjas" aria-hidden="true"></div>
@@ -230,7 +230,7 @@
           <header class="tarjeta-cabeza">
             <div>
               <h2 class="subtitulo">Carga semanal del equipo</h2>
-              <p class="nota">Promedio por jugador de RPE × minutos (UA), de lunes a domingo. Últimas 8 semanas; la barra roja es la semana en curso.</p>
+              <p class="nota" id="nota-carga-equipo">Promedio por jugador de RPE × minutos (UA), de lunes a domingo. Últimas 8 semanas; la barra roja es la semana en curso.</p>
             </div>
           </header>
           <div class="grafico" id="g-carga-equipo"></div>
@@ -248,6 +248,21 @@
               <thead><tr>
                 <th>Jugador</th><th class="num">Últimos 7 días</th><th class="num">Promedio semanal</th><th class="num">Aguda:crónica</th><th class="num">RPE medio</th><th class="num">Minutos jugados</th><th class="num">Último partido</th>
               </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="tarjeta" id="minutos-tarjeta" hidden>
+          <header class="tarjeta-cabeza">
+            <div>
+              <h2 class="subtitulo">Minutos de partido</h2>
+              <p class="nota">Lo que jugó cada uno en los últimos partidos, Primera y U21, sacado de las planillas de la CABB. No depende del formulario.</p>
+            </div>
+          </header>
+          <div class="tabla-caja">
+            <table class="tabla tabla-minutos" id="tabla-minutos">
+              <thead></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -416,10 +431,10 @@
 
   <script src="js/vendor/d3-7.9.0.min.js"></script>
   <script src="js/config.js?v=11"></script>
-  <script src="js/calculos.js?v=10"></script>
-  <script src="js/carga.js?v=10"></script>
-  <script src="js/partidos.js?v=10"></script>
-  <script src="js/graficos.js?v=10"></script>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/calculos.js?v=11"></script>
+  <script src="js/carga.js?v=11"></script>
+  <script src="js/partidos.js?v=11"></script>
+  <script src="js/graficos.js?v=11"></script>
+  <script src="js/app.js?v=11"></script>
 </body>
 </html>

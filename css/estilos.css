@@ -209,3 +209,8 @@ select, input[type="password"], input[type="text"] {
   .panel:not([hidden]) { animation: entrar .25s ease-out; }
   @keyframes entrar { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 }
+
+/* Minutos de partido: la celda se tiñe según los minutos jugados */
+.tabla-minutos th .sub { white-space: nowrap; max-width: 6.5em; margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+.tabla-minutos .celda-min { background: color-mix(in srgb, var(--rojo) calc(var(--n, 0) * 0.45%), transparent); }
+.tabla-minutos .total { font-weight: 700; }

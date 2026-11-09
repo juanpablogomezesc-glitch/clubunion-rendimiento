@@ -82,3 +82,33 @@ test('sesiones de las últimas 2 semanas, con respuestas', () => {
   assert.equal(m.sesionesRecientes[0].respuestas, 1);
   assert.equal(m.novedades.length, 1);
 });
+
+test('los partidos cuentan aunque el jugador no responda el formulario', () => {
+  const c = {
+    sesiones: [{ fecha: '2026-11-04', tipo: 'Partido', duracion: 120 }],
+    partidos: [
+      { fecha: '2026-11-04', rival: 'Sanjustino (U21)', jugador: 'Ana', minutos: 30 },
+      { fecha: '2026-11-04', rival: 'Sanjustino (U21)', jugador: 'Beto', minutos: 20 },
+      { fecha: '2026-11-04', rival: 'Sanjustino (U21)', jugador: 'Caro', minutos: 0 },
+    ],
+    rpe: [],
+    plantel: ['Ana', 'Beto', 'Caro'],
+  };
+  const sin = K.registros(c);
+  assert.equal(sin.length, 2, 'el que no jugó no suma');
+  assert.ok(sin.every((r) => r.estimada && r.rpe === K.RPE_PARTIDO));
+  assert.equal(sin.find((r) => r.jugador === 'Ana').carga, 30 * K.RPE_PARTIDO);
+
+  // Ana respondió: su carga es real y la de Beto se estima con el RPE medio de los partidos respondidos
+  c.rpe = [{ fecha: '2026-11-04', jugador: 'Ana', tipo: 'Partido', rpe: 9 }];
+  const con = K.registros(c);
+  assert.equal(con.length, 2);
+  assert.deepEqual(con.map((r) => [r.jugador, r.carga, r.estimada]).sort(), [['Ana', 270, false], ['Beto', 180, true]]);
+
+  const prep = K.preparar(c, '2026-11-09');
+  assert.equal(prep.estimadas, 1);
+  assert.equal(prep.sesionesRecientes[0].respuestas, 1, 'las estimadas no cuentan como respuestas');
+  assert.equal(prep.jugadores.find((j) => j.jugador === 'Beto').aguda, 180);
+  assert.equal(prep.minutosPartido.filas[0].jugador, 'Ana');
+  assert.equal(prep.minutosPartido.partidos[0].categoria, 'U21');
+});

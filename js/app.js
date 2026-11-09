@@ -166,13 +166,17 @@
     const u = CG.ultimoPartido;
     $('#tarjetas-carga').replaceChildren(
       tarjeta('Carga del equipo · últimos 7 días', CG.carga7 != null ? nf(CG.carga7, 0) : '—', 'UA',
-        CG.cambio7 != null ? `${signo(CG.cambio7, 1)} % contra los 7 días anteriores · promedio por jugador` : 'Promedio por jugador'),
+        (CG.cambio7 != null ? `${signo(CG.cambio7, 1)} % contra los 7 días anteriores · promedio por jugador` : 'Promedio por jugador') +
+        (CG.estimadas ? ' · partidos sin formulario estimados' : '')),
       tarjeta('Sesiones · últimos 7 días', String(CG.sesiones7), null, 'Cargadas en la pestaña Sesiones'),
       tarjeta('Formulario respondido', CG.cumplimiento != null ? String(CG.cumplimiento) : '—', CG.cumplimiento != null ? '%' : null,
         'De las sesiones de los últimos 14 días', CG.cumplimiento != null && CG.cumplimiento < 70 ? 'aviso' : null),
       tarjeta('Último partido', u ? u.rival || fechaCorta(u.fecha) : '—', null, u ? `${fechaCorta(u.fecha)} · jugaron ${u.jugaron}` : 'Todavía no hay partidos cargados'),
     );
     G.semanas($('#g-carga-equipo'), CG.equipoSemanal, {});
+    $('#nota-carga-equipo').textContent = 'Promedio por jugador de RPE × minutos (UA), de lunes a domingo. Últimas 8 semanas; la barra roja es la semana en curso.' +
+      (CG.estimadas ? ` Los partidos cuentan aunque el jugador no haya completado el formulario: en ese caso se usan sus minutos jugados × RPE ${nf(CG.rpeEstimado, 1)} (el promedio de los partidos respondidos, o 7 si todavía no hay).` : '');
+    minutosPartido();
 
     const conDatos = CG.jugadores.filter((j) => j.aguda != null || j.cronica != null || j.minutosTotal || j.ultimoPartido);
     const orden = [...conDatos].sort((a, b) => (b.relacion || 0) - (a.relacion || 0) || (b.aguda || 0) - (a.aguda || 0));
@@ -187,12 +191,36 @@
       if (j.ultimoPartido) ult.append(`${nf(j.ultimoPartido.minutos, 0)} min`, el('span', 'sub', `${j.ultimoPartido.rival} · ${fechaCorta(j.ultimoPartido.fecha)}`));
       else ult.append(el('span', 'neutro', '—'));
       tr.append(el('td', null, j.jugador),
-        el('td', 'num' + (j.aguda == null ? ' neutro' : ''), j.aguda != null ? nf(j.aguda, 0) : '—'),
+        (() => { const td = el('td', 'num' + (j.aguda == null ? ' neutro' : ''), j.aguda != null ? nf(j.aguda, 0) : '—'); if (j.estimada7) td.append(el('span', 'sub', 'con partido estimado')); return td; })(),
         el('td', 'num' + (j.cronica == null ? ' neutro' : ''), j.cronica != null ? nf(j.cronica, 0) : '—'),
         rel,
         el('td', 'num' + (j.rpe7 == null ? ' neutro' : ''), j.rpe7 != null ? nf(j.rpe7, 1) : '—'),
         el('td', 'num', j.minutosTotal ? nf(j.minutosTotal, 0) : '—'),
         ult);
+      return tr;
+    }));
+  }
+
+  function minutosPartido() {
+    const mp = CG.minutosPartido || { partidos: [], filas: [] };
+    $('#minutos-tarjeta').hidden = !mp.filas.length;
+    if (!mp.filas.length) return;
+    const tope = Math.max(...mp.filas.flatMap((f) => f.minutos.map((m) => m || 0)), 1);
+    const cab = el('tr');
+    cab.append(el('th', null, 'Jugador'), ...mp.partidos.map((p) => {
+      const th = el('th', 'num');
+      th.append(fechaCorta(p.fecha), el('span', 'sub', `${p.categoria === 'Primera' ? '' : p.categoria + ' · '}${String(p.rival).replace(/\s*\(U\d{2}\)\s*$/i, '')}`));
+      return th;
+    }), el('th', 'num', 'Total'));
+    $('#tabla-minutos thead').replaceChildren(cab);
+    $('#tabla-minutos tbody').replaceChildren(...mp.filas.map((f) => {
+      const tr = el('tr');
+      tr.append(el('td', null, f.jugador), ...f.minutos.map((m) => {
+        if (m == null) return el('td', 'num neutro', '');
+        const td = el('td', 'num celda-min', m > 0 ? nf(m, 0) : '0');
+        if (m > 0) td.style.setProperty('--n', String(Math.round((100 * m) / tope)));
+        return td;
+      }), el('td', 'num total', nf(f.total, 0)));
       return tr;
     }));
   }
